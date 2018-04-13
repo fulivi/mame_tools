@@ -1,0 +1,9 @@
+<mamecheat version="1">
+
+  <cheat desc="Long HPIB timeout">
+    <script state="run">
+      <!-- Actually it's 239 -->
+      <action>cpu.mw@472=6aa</action>
+    </script>
+  </cheat>
+</mamecheat>
