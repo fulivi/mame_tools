@@ -39,7 +39,7 @@ The amigo_drive tool is to be launched before running MAME.
 
 Use these options on the MAME command line:
 
-`-slot0 98034_hpib -rom1 massd -slot0:98034_hpib:ieee_rem remote488 -remt socket.localhost:1234`
+`-slot0 98034_hpib -rom1 massd -slot0:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234`
 
 When emulating an HP9895 drive, the first unit is referred to as `:H7` and the second one as `:H7,0,1`.
 
@@ -47,7 +47,7 @@ When emulating an HP9895 drive, the first unit is referred to as `:H7` and the s
 
 Use these options on the MAME command line:
 
-`-slot1 82937_hpib -rom1 mass -slot1:82937_hpib:ieee_rem remote488 -remt socket.localhost:1234`
+`-slot1 82937_hpib -rom1 mass -slot1:82937_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234`
 
 When emulating an HP9895 drive, the first unit is referred to as `:D700` and the second one as `:D701`.
 
@@ -55,7 +55,7 @@ When emulating an HP9895 drive, the first unit is referred to as `:D700` and the
 
 Use these options on the MAME command line:
 
-`-ieee_rem remote488 -remt socket.localhost:1234`
+`-ieee_rem remote488 -bitb socket.localhost:1234`
 
 The 9134b model is to be selected in amigo_drive. In order to boot from HD the "System source" DIP switch should be set to "Sys bus".
 
@@ -85,11 +85,11 @@ Follow these steps to use this tool with MAME.
 
    1. Start MAME with these options on HP9845:
 
-      `-slot0 98034_hpib -rom1 massd -slot0:98034_hpib:ieee_rem remote488 -remt socket.localhost:1234`
+      `-slot0 98034_hpib -rom1 massd -slot0:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234`
 
       On HP85, add these options:
 
-      `-slot1 82937_hpib -rom1 mass -slot1:82937_hpib:ieee_rem remote488 -remt socket.localhost:1234`
+      `-slot1 82937_hpib -rom1 mass -slot1:82937_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234`
 
    2. Before emulation begins, start mini_9895 as follows:
 
