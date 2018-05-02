@@ -186,6 +186,13 @@ class ParallelPoll(BusCmd):
     def __str__(self ):
         return "PP      {}".format(self.state)
 
+class DeviceClear(BusCmd):
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "CLEAR"
+
 class UnknownModel(Exception):
     pass
 
@@ -315,6 +322,7 @@ class DriveState:
         # 1     Wait for send addr/status
         # 2     Wait for send data
         # 3     Wait for receive data
+        # 4     Wait for device clear
         self.cmd_seq_state = 0
 
     def send_pp_state(self):
@@ -483,6 +491,9 @@ class DriveState:
                     if not pp_state:
                         yield ParallelPoll(True)
                         pp_state = True
+                elif (listener and msg_data == 0x04) or msg_data == 0x14:
+                    state = 0
+                    yield DeviceClear()
                 elif not is_pcg:
                     # Secondary address
                     if sa_state == 1:
@@ -689,6 +700,10 @@ class DriveState:
         self.cmd_seq_state = 0
 
     def cmd_amigo_clear(self, c):
+        if self.require_seq_state(0 , False):
+            self.cmd_seq_state = 4
+
+    def cmd_dev_clear(self, c):
         self.cmd_seq_state = 0
         self.clear_errors()
         for u in self.units:
@@ -704,6 +719,15 @@ class DriveState:
     def cmd_parallel_poll(self, c):
         self.set_pp(c.state)
 
+    def cmd_unknown_listen(self, c):
+        self.set_error(10)
+        self.cmd_seq_state = 0
+
+    def cmd_unknown_talk(self, c):
+        self.send_end_byte()
+        self.set_error(10)
+        self.cmd_seq_state = 0
+
     # Listen command decoding table
     # Fields in key tuple:
     # [ 0 ]     Secondary address
@@ -717,7 +741,6 @@ class DriveState:
         (   8 ,   2 ,    8) : ("Unbuffered write"     , cmd_unbuff_wr),
         (   8 ,   2 , 0x0b) : ("Initialize"           , cmd_initialize),
         (   8 ,   6 , 0x0c) : ("Set address record"   , cmd_set_addr_rec),
-        (   8 ,   2 , 0x0f) : ("Download"             , cmd_download),
         (   8 ,   2 , 0x14) : ("Request log. address" , cmd_req_log_addr),
         (   8 ,   2 , 0x15) : ("End"                  , cmd_end),
         (   9 ,   2 ,    8) : ("Buffered write"       , cmd_buff_wr),
@@ -750,18 +773,18 @@ class DriveState:
                     try:
                         c.cmd = DriveState.LISTEN_CMDS[ key_tuple ]
                     except KeyError:
-                        # TODO: map unknown cmd
-                        c.cmd = ("Unknown" , None)
+                        c.cmd = ("Unknown" , DriveState.cmd_unknown_listen)
             elif isinstance(c , TalkCmd):
                 try:
                     c.cmd = DriveState.TALK_CMDS[ c.sec_addr ]
                 except KeyError:
-                    # TODO: map unknown cmd
-                    c.cmd = ("Unknown" , None)
+                    c.cmd = ("Unknown" , DriveState.cmd_unknown_talk)
             elif isinstance(c , IdentifyCmd):
                 c.cmd = (str(c) , DriveState.cmd_identify)
             elif isinstance(c , ParallelPoll):
                 c.cmd = (str(c) , DriveState.cmd_parallel_poll)
+            elif isinstance(c , DeviceClear):
+                c.cmd = (str(c) , DriveState.cmd_dev_clear)
             else:
                 c.cmd = None
             yield c

@@ -67,6 +67,23 @@ Once the emulation has started, bring up the UI and activate the cheat.
 
 The cheat is not strictly necessary as the system will usually recover from missed DSJs. However, disk I/O slows down considerably when access is retried.
 
+### Usage on HP IPC
+
+Use these options on the MAME command line:
+
+`-ieee_rem remote488 -bitb socket.localhost:1234`
+
+You can directly use the raw images of IPC disks that are available around on the Internet. Set amigo_drive to emulate a HP9895 to load any of these. The IPC OS doesn't check for the correct size so images for the internal floppy drive can be loaded into an external 9895.
+
+If you want to create an image from scratch you need to format it before files can be stored there, just as with real disks. Follow these steps:
+
+   1. Create a 0-sized file as image and mount it in amigo_drive (any drive model is ok),
+   2. Start IPC emulation and load "Utilities" disk in internal floppy,
+   3. Select "format_disc" command in PAM,
+   4. Press F4 to set target drive to "D000",
+   5. (Optionally) Press F3 to set the image name,
+   6. Press F1 to start the format operation.
+
 ## mini_9895
 
 This tool emulates drive #0 of a HP9895 dual-floppy drive. It's meant to be interfaced with MAME emulation of HP9845 or HP85 systems through the IEEE-488 remotizer.

@@ -506,6 +506,26 @@ std::string ParallelPoll::to_string() const
 }
 
 // ////////////////////////////////////////////////////////////////////////////////
+// Device clear command
+class DeviceClear : public BusCmd
+{
+public:
+	DeviceClear();
+
+	virtual std::string to_string() const override;
+	virtual dec_cmd_ptr decode() override;
+};
+
+DeviceClear::DeviceClear()
+{
+}
+
+std::string DeviceClear::to_string() const
+{
+	return "CLEAR";
+}
+
+// ////////////////////////////////////////////////////////////////////////////////
 // Commands that are differentiated by a secondary address (either Talk or Listen commands)
 class SecAddrCmd : public BusCmd
 {
@@ -669,6 +689,40 @@ std::string DecParallelPoll::to_string() const
 bool DecParallelPoll::pp_enable() const
 {
 	return false;
+}
+
+// ////////////////////////////////////////////////////////////////////////////////
+// Device clear decoded command
+class DecDeviceClear : public DecodedCmd
+{
+public:
+	DecDeviceClear();
+
+	virtual std::string to_string() const override;
+	virtual void exec(DriveState& state) override;
+	virtual bool pp_enable() const override;
+private:
+	bool enable;
+};
+
+// Decoder from DeviceClear to DecDeviceClear
+dec_cmd_ptr DeviceClear::decode()
+{
+	return std::make_unique<DecDeviceClear>();
+}
+
+DecDeviceClear::DecDeviceClear()
+{
+}
+
+std::string DecDeviceClear::to_string() const
+{
+	return "CLEAR";
+}
+
+bool DecDeviceClear::pp_enable() const
+{
+	return true;
 }
 
 // ////////////////////////////////////////////////////////////////////////////////
@@ -1143,7 +1197,7 @@ std::string ListenAmigoClear::to_string() const
 
 bool ListenAmigoClear::pp_enable() const
 {
-	return true;
+	return false;
 }
 
 // ////////////////////////////////////////////////////////////////////////////////
@@ -1343,6 +1397,10 @@ raw_cmd_ptr CmdDecoder::get_cmd()
 					pp_state = true;
 					return std::make_unique<ParallelPoll>(true);
 				}
+			} else if ((listener && msg.msg_data == 0x04) || msg.msg_data == 0x14) {
+				// Device clear
+				dec_state = DecFSMState::DEC_IDLE;
+				return std::make_unique<DeviceClear>();
 			} else if (!is_pcg) {
 				switch (sa_state) {
 				case SAFSMState::SA_PACS:
@@ -1627,7 +1685,8 @@ private:
 		SEQ_IDLE,   // Not waiting for a particular cmd
 		SEQ_WAIT_SEND_STATUS,   // Waiting for send addr/status cmd
 		SEQ_WAIT_SEND_DATA,     // Waiting for send data cmd
-		SEQ_WAIT_RECEIVE_DATA   // Waiting for receive data cmd
+		SEQ_WAIT_RECEIVE_DATA,  // Waiting for receive data cmd
+		SEQ_WAIT_CLEAR			// Waiting for clear cmd
 	};
 
 	CmdSeqState cmd_seq_state;
@@ -1656,6 +1715,7 @@ private:
 
 	friend void DecIdentifyCmd::exec(DriveState& state);
 	friend void DecParallelPoll::exec(DriveState& state);
+	friend void DecDeviceClear::exec(DriveState& state);
 	friend void UnkTalkCmd::exec(DriveState& state);
 	friend void TalkSendData::exec(DriveState& state);
 	friend void TalkSendStatus::exec(DriveState& state);
@@ -1828,6 +1888,11 @@ void DecParallelPoll::exec(DriveState& state)
 	state.set_pp(enable);
 }
 
+void DecDeviceClear::exec(DriveState& state)
+{
+	state.amigo_clear();
+}
+
 void UnkTalkCmd::exec(DriveState& state)
 {
 	// TODO:
@@ -1862,7 +1927,8 @@ void TalkDSJ::exec(DriveState& state)
 
 void UnkListenCmd::exec(DriveState& state)
 {
-	// TODO:
+	state.set_error(DriveState::ERROR_IO);
+	state.cmd_seq_state = DriveState::CmdSeqState::SEQ_IDLE;
 }
 
 void ListenReceiveData::exec(DriveState& state)
@@ -2002,7 +2068,9 @@ void ListenFormat::exec(DriveState& state)
 
 void ListenAmigoClear::exec(DriveState& state)
 {
-	state.amigo_clear();
+	if (state.require_seq_state(DriveState::CmdSeqState::SEQ_IDLE, false)) {
+		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_WAIT_CLEAR;
+	}
 }
 
 // ********************************************************************************
