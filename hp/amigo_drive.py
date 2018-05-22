@@ -28,7 +28,7 @@ debug_print = None
 class ConnectionClosed(Exception):
     pass
 
-MSGS = "DEJKQRS"
+MSGS = "DEJKQRSXY"
 
 class Remote488MsgIO:
     def my_th(self):
@@ -162,6 +162,13 @@ class BusCmd:
 class IdentifyCmd(BusCmd):
     def __str__(self ):
         return "IDENTIFY"
+
+class CPReachedCmd(BusCmd):
+    def __init__(self, flushed):
+        self.flushed = flushed
+
+    def __str__(self ):
+        return "CP F={}".format(self.flushed)
 
 class TalkCmd(BusCmd):
     def __init__(self , sec_addr):
@@ -323,7 +330,9 @@ class DriveState:
         # 2     Wait for send data
         # 3     Wait for receive data
         # 4     Wait for device clear
-        self.cmd_seq_state = 0
+        # 5     Wait for CP in unbuffered reading
+        # 6     Wait for receive data in unbuffered writing
+        self.set_seq_state(0)
 
     def send_pp_state(self):
         self.io.send_pp_state(0x80 if self.pp_state else 0)
@@ -361,8 +370,14 @@ class DriveState:
     def send_end_byte(self):
         self.io.send_data(b"\x01" , True)
 
+    def send_checkpoint(self ):
+        self.io.send_msg('X' , 0)
+
+    def set_seq_state(self, state):
+        self.cmd_seq_state = state
+
     def set_seq_error(self , talker):
-        self.cmd_seq_state = 0
+        self.set_seq_state(0)
         if self.dsj == 0:
             # I/O error
             self.set_error(10)
@@ -370,10 +385,11 @@ class DriveState:
             self.send_end_byte()
 
     def require_seq_state(self, req_state, talker):
-        if self.cmd_seq_state != req_state:
+        if self.cmd_seq_state != req_state and ((self.cmd_seq_state != 5 and self.cmd_seq_state != 6) or req_state != 0):
             self.set_seq_error(talker)
             return False
         else:
+            self.cmd_seq_state = req_state
             return True
 
     def dsj1_holdoff(self):
@@ -439,6 +455,12 @@ class DriveState:
             elif msg_type == 'S':
                 signals |= msg_data
             elif msg_type == 'Q':
+                continue
+            elif msg_type == 'X':
+                self.io.send_msg('Y' , 0)
+                continue
+            elif msg_type == 'Y':
+                yield CPReachedCmd(msg_data != 0)
                 continue
             is_cmd = (signals & 1) == 0 and msg_type == 'D'
             if is_cmd:
@@ -530,18 +552,28 @@ class DriveState:
                 if listener and not is_cmd:
                     if msg_type == 'D' or msg_type == 'E':
                         params.append(msg_data)
-                    if len(params) == 256 or msg_type == 'E':
-                        state = 0
-                        yield ListenCmd(sec_addr , params)
+                        if msg_type == 'E':
+                            state = 0
+                            yield ListenCmd(sec_addr , params)
+                        elif len(params) == 256:
+                            yield ListenCmd(sec_addr , params)
+                            params = bytearray()
 
     # Commands
     def cmd_rx_data(self, c):
-        if self.require_seq_state(3 , False):
+        if self.cmd_seq_state != 3 and self.cmd_seq_state != 6:
+            self.set_seq_error(False)
+        elif self.lba_out_of_range():
+            self.set_seq_state(0)
+        else:
             unit = self.units[ self.current_unit ]
+            chs = unit.get_current_chs()
+            print("WR {} ({},{},{})".format(unit.current_lba , chs[ 0 ] , chs[ 1 ] , chs[ 2 ]))
             self.buffer_[ :len(c.params) ] = c.params
             unit.write_img(self.buffer_)
             self.clear_errors()
-            self.cmd_seq_state = 0
+            if self.cmd_seq_state == 3:
+                self.set_seq_state(0)
 
     def cmd_seek(self, c):
         if self.require_seq_state(0 , False) and self.is_dsj_ok():
@@ -589,11 +621,7 @@ class DriveState:
             unit.f_bit = False
             unit.c_bit = False
             self.clear_errors()
-            self.cmd_seq_state = 1
-
-    def cmd_unbuff_rd(self, c):
-        # TODO:
-        pass
+            self.set_seq_state(1)
 
     def cmd_verify(self, c):
         if self.require_seq_state(0 , False) and self.is_dsj_ok():
@@ -608,10 +636,6 @@ class DriveState:
                     new_lba = min(self.fixed_data.max_lba , unit.current_lba + sec_count)
                     unit.current_lba = new_lba
                 self.clear_errors()
-
-    def cmd_unbuff_wr(self, c):
-        # TODO:
-        pass
 
     def cmd_initialize(self, c):
         # TODO:
@@ -643,7 +667,7 @@ class DriveState:
             self.status[ 3 ] = chs[ 2 ]
             print("Log. address = ({},{},{})".format(chs[ 0 ] , chs[ 1 ] , chs[ 2 ]))
             self.clear_errors()
-            self.cmd_seq_state = 1
+            self.set_seq_state(1)
 
     def cmd_end(self, c):
         if self.require_seq_state(0 , False) and self.is_dsj_ok():
@@ -651,15 +675,19 @@ class DriveState:
             self.clear_errors()
             self.pp_enabled = False
 
-    def cmd_buff_wr(self, c):
+    def cmd_write(self, c, seq_state):
         if self.require_seq_state(0 , False) and self.is_dsj_ok():
             unit = self.select_unit_check_f(c.params[ 1 ])
             if unit and not self.dsj1_holdoff() and not self.lba_out_of_range():
-                chs = unit.get_current_chs()
-                print("WR {} ({},{},{})".format(unit.current_lba , chs[ 0 ] , chs[ 1 ] , chs[ 2 ]))
-                self.cmd_seq_state = 3
+                self.set_seq_state(seq_state)
 
-    def cmd_buff_rd(self, c):
+    def cmd_buff_wr(self, c):
+        self.cmd_write(c , 3)
+
+    def cmd_unbuff_wr(self, c):
+        self.cmd_write(c , 6)
+
+    def cmd_read(self, c):
         if self.require_seq_state(0 , False) and self.is_dsj_ok():
             unit = self.select_unit_check_f(c.params[ 1 ])
             if unit and not self.dsj1_holdoff() and not self.lba_out_of_range():
@@ -667,7 +695,15 @@ class DriveState:
                 print("RD {} ({},{},{})".format(unit.current_lba , chs[ 0 ] , chs[ 1 ] , chs[ 2 ]))
                 self.buffer_ = unit.read_img()
                 self.clear_errors()
-                self.cmd_seq_state = 2
+                self.set_seq_state(2)
+
+    def cmd_buff_rd(self, c):
+        self.unbuffered = False
+        self.cmd_read(c)
+
+    def cmd_unbuff_rd(self, c):
+        self.unbuffered = True
+        self.cmd_read(c)
 
     def cmd_format(self, c):
         if self.require_seq_state(0 , False) and self.is_dsj_ok():
@@ -681,30 +717,59 @@ class DriveState:
     def cmd_tx_data(self, c):
         if self.require_seq_state(2 , True):
             self.io.send_data(self.buffer_)
-            self.cmd_seq_state = 0
+            self.send_checkpoint()
+            if self.unbuffered:
+                self.set_seq_state(5)
+                self.pp_enabled = False
+            else:
+                self.set_seq_state(0)
+
+    def cmd_cp_reached(self, c):
+        if self.cmd_seq_state == 5:
+            if c.flushed:
+                self.set_seq_state(0)
+                self.pp_enabled = True
+            else:
+                unit = self.units[ self.current_unit ]
+                if unit.is_lba_ok():
+                    chs = unit.get_current_chs()
+                    print("RD {} ({},{},{})".format(unit.current_lba , chs[ 0 ] , chs[ 1 ] , chs[ 2 ]))
+                    self.buffer_ = unit.read_img()
+                    self.io.send_data(self.buffer_)
+                    self.send_checkpoint()
+                    self.pp_enabled = False
+                else:
+                    self.send_end_byte()
+                    self.send_checkpoint()
+                    self.set_seq_state(0)
+                    self.pp_enabled = True
+            self.set_pp(True)
 
     def cmd_tx_status(self, c):
         if self.require_seq_state(1 , True):
             self.io.send_data(self.status)
             # Add a 0x01 byte with EOI
-            #self.send_end_byte()
-            self.cmd_seq_state = 0
+            self.send_end_byte()
+            self.send_checkpoint()
+            self.set_seq_state(0)
 
     def cmd_dsj(self, c):
         if self.require_seq_state(0 , True):
             print("DSJ={}".format(self.dsj))
             self.io.send_data([ self.dsj ] , True)
+            self.send_checkpoint()
             if self.dsj == 2:
                 self.dsj = 0
         self.pp_enabled = False
-        self.cmd_seq_state = 0
+        self.set_seq_state(0)
 
     def cmd_amigo_clear(self, c):
         if self.require_seq_state(0 , False):
-            self.cmd_seq_state = 4
+            self.set_seq_state(4)
+            self.pp_enabled = False
 
     def cmd_dev_clear(self, c):
-        self.cmd_seq_state = 0
+        self.set_seq_state(0)
         self.clear_errors()
         for u in self.units:
             u.a_bit = False
@@ -712,6 +777,8 @@ class DriveState:
             u.c_bit = False
             u.current_lba = 0
         self.current_unit = 0
+        self.pp_enabled = True
+        self.set_pp(True)
 
     def cmd_identify(self, c):
         self.io.send_data(self.fixed_data.id_seq , True)
@@ -721,12 +788,12 @@ class DriveState:
 
     def cmd_unknown_listen(self, c):
         self.set_error(10)
-        self.cmd_seq_state = 0
+        self.set_seq_state(0)
 
     def cmd_unknown_talk(self, c):
         self.send_end_byte()
         self.set_error(10)
-        self.cmd_seq_state = 0
+        self.set_seq_state(0)
 
     # Listen command decoding table
     # Fields in key tuple:
@@ -785,6 +852,8 @@ class DriveState:
                 c.cmd = (str(c) , DriveState.cmd_parallel_poll)
             elif isinstance(c , DeviceClear):
                 c.cmd = (str(c) , DriveState.cmd_dev_clear)
+            elif isinstance(c , CPReachedCmd):
+                c.cmd = (str(c) , DriveState.cmd_cp_reached)
             else:
                 c.cmd = None
             yield c
@@ -813,6 +882,7 @@ def main():
             print(m)
         sys.exit(1)
 
+    global debug_print
     debug_print = args.dbg
 
     io = socket.socket()
