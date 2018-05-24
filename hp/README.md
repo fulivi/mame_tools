@@ -84,6 +84,12 @@ If you want to create an image from scratch you need to format it before files c
    5. (Optionally) Press F3 to set the image name,
    6. Press F1 to start the format operation.
 
+### Usage on HP 9000/3xx
+
+Use these options on the MAME command line:
+
+`-ieee_rem remote488 -bitb socket.localhost:1234`
+
 ## mini_9895
 
 This tool emulates drive #0 of a HP9895 dual-floppy drive. It's meant to be interfaced with MAME emulation of HP9845 or HP85 systems through the IEEE-488 remotizer.
