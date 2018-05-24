@@ -41,6 +41,8 @@ constexpr char MSG_PP_DATA       = 'P'; // Parallel poll data
 constexpr char MSG_PP_REQUEST    = 'Q'; // Request PP data
 constexpr char MSG_ECHO_REQ      = 'J'; // Heartbeat msg: echo request
 constexpr char MSG_ECHO_REPLY    = 'K'; // Heartbeat msg: echo reply
+constexpr char MSG_CHECKPOINT    = 'X';	// Set checkpoint
+constexpr char MSG_CP_REACHED    = 'Y';	// Checkpoint reached
 
 // Size of sectors
 constexpr unsigned SECTOR_SIZE  = 256;
@@ -69,6 +71,7 @@ public:
 	void send_data(const std::vector<uint8_t>& data , bool eoi_at_end = false);
 	void send_end_byte(uint8_t byte);
 	void send_pp_state(uint8_t pp_state);
+	void send_checkpoint();
 
 private:
 	int socket_fd;
@@ -166,6 +169,12 @@ void Remote488MsgIO::send_end_byte(uint8_t byte)
 void Remote488MsgIO::send_pp_state(uint8_t pp_state)
 {
 	Msg msg{ MSG_PP_DATA , pp_state };
+	send_msg(msg);
+}
+
+void Remote488MsgIO::send_checkpoint()
+{
+	Msg msg{ MSG_CHECKPOINT , 0 };
 	send_msg(msg);
 }
 
@@ -307,7 +316,9 @@ bool Remote488MsgIO::is_msg_type(char c)
 		c == MSG_DATA_BYTE ||
 		c == MSG_END_BYTE ||
 		c == MSG_PP_REQUEST ||
-		c == MSG_ECHO_REQ;
+		c == MSG_ECHO_REQ ||
+		c == MSG_CHECKPOINT ||
+		c == MSG_CP_REACHED;
 }
 
 bool Remote488MsgIO::is_terminator(char c)
@@ -553,6 +564,7 @@ public:
 	virtual dec_cmd_ptr decode() override;
 
 	void add_parameter(uint8_t p);
+	std::size_t parameter_len() const;
 protected:
 	std::vector<uint8_t> params;
 };
@@ -579,6 +591,11 @@ void ListenCmd::add_parameter(uint8_t p)
 	params.push_back(p);
 }
 
+std::size_t ListenCmd::parameter_len() const
+{
+	return params.size();
+}
+
 // ////////////////////////////////////////////////////////////////////////////////
 // Talk commands
 class TalkCmd : public SecAddrCmd
@@ -600,6 +617,30 @@ std::string TalkCmd::to_string() const
 	char str[ 16 ];
 	sprintf(str, "TALK %02x:" , sec_addr);
 	return str;
+}
+
+// ////////////////////////////////////////////////////////////////////////////////
+// Checkpoint reached "command"
+class CPReachedCmd : public BusCmd
+{
+public:
+	CPReachedCmd(bool flush);
+
+	virtual std::string to_string() const override;
+	virtual dec_cmd_ptr decode() override;
+
+private:
+	bool flushed;
+};
+
+CPReachedCmd::CPReachedCmd(bool flush)
+	: flushed(flush)
+{
+}
+
+std::string CPReachedCmd::to_string() const
+{
+	return "CP";
 }
 
 // ////////////////////////////////////////////////////////////////////////////////
@@ -1109,6 +1150,37 @@ bool ListenBuffWr::pp_enable() const
 }
 
 // ////////////////////////////////////////////////////////////////////////////////
+// Unbuffered write command
+class ListenUnbuffWr : public DecodedCmd
+{
+public:
+	ListenUnbuffWr(unsigned unit);
+
+	virtual std::string to_string() const override;
+	virtual void exec(DriveState& state) override;
+	virtual bool pp_enable() const override;
+private:
+	unsigned my_unit;
+};
+
+ListenUnbuffWr::ListenUnbuffWr(unsigned unit)
+	: my_unit(unit)
+{
+}
+
+std::string ListenUnbuffWr::to_string() const
+{
+	char s[ 16 ];
+	sprintf(s, "UNBUFFERED WR %u" , my_unit);
+	return std::string{s};
+}
+
+bool ListenUnbuffWr::pp_enable() const
+{
+	return true;
+}
+
+// ////////////////////////////////////////////////////////////////////////////////
 // Buffered read command
 class ListenBuffRd : public DecodedCmd
 {
@@ -1135,6 +1207,37 @@ std::string ListenBuffRd::to_string() const
 }
 
 bool ListenBuffRd::pp_enable() const
+{
+	return true;
+}
+
+// ////////////////////////////////////////////////////////////////////////////////
+// Unbuffered read command
+class ListenUnbuffRd : public DecodedCmd
+{
+public:
+	ListenUnbuffRd(unsigned unit);
+
+	virtual std::string to_string() const override;
+	virtual void exec(DriveState& state) override;
+	virtual bool pp_enable() const override;
+private:
+	unsigned my_unit;
+};
+
+ListenUnbuffRd::ListenUnbuffRd(unsigned unit)
+	: my_unit(unit)
+{
+}
+
+std::string ListenUnbuffRd::to_string() const
+{
+	char s[ 16 ];
+	sprintf(s, "UNBUFFERED RD %u" , my_unit);
+	return std::string{s};
+}
+
+bool ListenUnbuffRd::pp_enable() const
 {
 	return true;
 }
@@ -1216,9 +1319,15 @@ dec_cmd_ptr ListenCmd::decode()
 		} else if (params.size() == 2 && params[ 0 ] == 3) {
 			// Request status
 			return std::make_unique<ListenReqStatus>(params[ 1 ]);
+		} else if (params.size() == 2 && params[ 0 ] == 5) {
+			// Unbuffered read
+			return std::make_unique<ListenUnbuffRd>(params[ 1 ]);
 		} else if (params.size() == 4 && params[ 0 ] == 7) {
 			// Verify
 			return std::make_unique<ListenVerify>(params[ 1 ] , params.data() + 2);
+		} else if (params.size() == 2 && params[ 0 ] == 8) {
+			// Unbuffered write
+			return std::make_unique<ListenUnbuffWr>(params[ 1 ]);
 		} else if (params.size() == 2 && params[ 0 ] == 0x14) {
 			// Request logical address
 			return std::make_unique<ListenReqLogAddr>();
@@ -1274,6 +1383,41 @@ dec_cmd_ptr ListenCmd::decode()
 	}
 
 	return std::make_unique<UnkListenCmd>(std::move(*this));
+}
+
+// ////////////////////////////////////////////////////////////////////////////////
+// CP reached decoded command
+class DecCPReachedCmd : public DecodedCmd
+{
+public:
+	DecCPReachedCmd(bool flush);
+
+	virtual std::string to_string() const override;
+	virtual void exec(DriveState& state) override;
+	virtual bool pp_enable() const override;
+private:
+	bool flushed;
+};
+
+// Decoder from CPReachedCmd to DecCPReachedCmd
+dec_cmd_ptr CPReachedCmd::decode()
+{
+	return std::make_unique<DecCPReachedCmd>(flushed);
+}
+
+DecCPReachedCmd::DecCPReachedCmd(bool flush)
+	: flushed(flush)
+{
+}
+
+std::string DecCPReachedCmd::to_string() const
+{
+	return "CP";
+}
+
+bool DecCPReachedCmd::pp_enable() const
+{
+	return false;
 }
 
 // ********************************************************************************
@@ -1348,6 +1492,16 @@ raw_cmd_ptr CmdDecoder::get_cmd()
 
 		case MSG_PP_REQUEST:
 			continue;
+
+		case MSG_CHECKPOINT:
+			{
+				Remote488MsgIO::Msg cp_reached{ MSG_CP_REACHED , 0 };
+				io.send_msg(cp_reached);
+			}
+			continue;
+
+		case MSG_CP_REACHED:
+			return std::make_unique<CPReachedCmd>(msg.msg_data != 0);
 		}
 		bool is_cmd = (signals & 1) == 0 && msg.msg_type == MSG_DATA_BYTE;
 		if (is_cmd) {
@@ -1448,12 +1602,18 @@ raw_cmd_ptr CmdDecoder::get_cmd()
 
 		case DecFSMState::DEC_MLA_SA:
 			if (listener && !is_cmd) {
+				auto cmd = dynamic_cast<ListenCmd*>(pending_cmd.get());
 				if (msg.msg_type == MSG_DATA_BYTE || msg.msg_type == MSG_END_BYTE) {
-					dynamic_cast<ListenCmd*>(pending_cmd.get())->add_parameter(msg.msg_data);
+					cmd->add_parameter(msg.msg_data);
 				}
 				if (msg.msg_type == MSG_END_BYTE) {
 					dec_state = DecFSMState::DEC_IDLE;
 					return std::move(pending_cmd);
+				} else if (cmd->parameter_len() == SECTOR_SIZE) {
+					uint8_t sa = cmd->get_sa();
+					raw_cmd_ptr tmp = std::make_unique<ListenCmd>(sa);
+					pending_cmd.swap(tmp);
+					return std::move(tmp);
 				}
 			}
 			break;
@@ -1686,13 +1846,17 @@ private:
 		SEQ_WAIT_SEND_STATUS,   // Waiting for send addr/status cmd
 		SEQ_WAIT_SEND_DATA,     // Waiting for send data cmd
 		SEQ_WAIT_RECEIVE_DATA,  // Waiting for receive data cmd
-		SEQ_WAIT_CLEAR			// Waiting for clear cmd
+		SEQ_WAIT_CLEAR,			// Waiting for clear cmd
+		SEQ_WAIT_SD_URD,		// Waiting for send data in unbuffered read
+		SEQ_WAIT_CP_URD,		// Waiting for CP in unbuffered read
+		SEQ_WAIT_RD_UWR			// Waiting for receive data in unbuffered write
 	};
 
 	CmdSeqState cmd_seq_state;
 
 	void set_pp(bool state);
 
+	void set_seq_state(CmdSeqState state);
 	void set_seq_error(bool talker);
 	bool require_seq_state(CmdSeqState req_state , bool talker);
 	bool is_dsj_ok() const;
@@ -1712,6 +1876,8 @@ private:
 	void clear_errors();
 	void clear_dsj();
 	void amigo_clear();
+	void common_write(unsigned unit_no , CmdSeqState new_state);
+	void common_read(unsigned unit_no , CmdSeqState new_state);
 
 	friend void DecIdentifyCmd::exec(DriveState& state);
 	friend void DecParallelPoll::exec(DriveState& state);
@@ -1728,9 +1894,12 @@ private:
 	friend void ListenReqLogAddr::exec(DriveState& state);
 	friend void ListenEnd::exec(DriveState& state);
 	friend void ListenBuffWr::exec(DriveState& state);
+	friend void ListenUnbuffWr::exec(DriveState &state);
 	friend void ListenBuffRd::exec(DriveState& state);
+	friend void ListenUnbuffRd::exec(DriveState &state);
 	friend void ListenFormat::exec(DriveState& state);
 	friend void ListenAmigoClear::exec(DriveState& state);
+	friend void DecCPReachedCmd::exec(DriveState& state);
 };
 
 DriveState::DriveState(Remote488MsgIO& intf , const FixedData& fix_data , FILE *fp[])
@@ -1774,9 +1943,14 @@ void DriveState::set_pp(bool state)
 	}
 }
 
+void DriveState::set_seq_state(CmdSeqState state)
+{
+	cmd_seq_state = state;
+}
+
 void DriveState::set_seq_error(bool talker)
 {
-	cmd_seq_state = CmdSeqState::SEQ_IDLE;
+	set_seq_state(CmdSeqState::SEQ_IDLE);
 	if (dsj == 0) {
 		set_error(ERROR_IO);
 	}
@@ -1787,11 +1961,12 @@ void DriveState::set_seq_error(bool talker)
 
 bool DriveState::require_seq_state(CmdSeqState req_state , bool talker)
 {
-	if (cmd_seq_state != req_state) {
+	if (cmd_seq_state != req_state &&
+		((cmd_seq_state != CmdSeqState::SEQ_WAIT_CP_URD && cmd_seq_state != CmdSeqState::SEQ_WAIT_RD_UWR) || req_state != CmdSeqState::SEQ_IDLE)) {
 		set_seq_error(talker);
-		cmd_seq_state = CmdSeqState::SEQ_IDLE;
 		return false;
 	} else {
+		set_seq_state(req_state);
 		return true;
 	}
 }
@@ -1871,8 +2046,33 @@ void DriveState::amigo_clear()
 		u->set_lba(0);
 	}
 	current_unit = 0;
-	cmd_seq_state = CmdSeqState::SEQ_IDLE;
+	set_seq_state(CmdSeqState::SEQ_IDLE);
 	clear_errors();
+}
+
+void DriveState::common_write(unsigned unit_no , CmdSeqState new_state)
+{
+	if (require_seq_state(CmdSeqState::SEQ_IDLE, false) &&
+		is_dsj_ok() &&
+		select_unit(unit_no) != nullptr &&
+		!dsj1_holdoff() &&
+		is_lba_ok()) {
+		set_seq_state(new_state);
+	}
+}
+
+void DriveState::common_read(unsigned unit_no , CmdSeqState new_state)
+{
+	UnitState *unit;
+	if (require_seq_state(DriveState::CmdSeqState::SEQ_IDLE, false) &&
+		is_dsj_ok() &&
+		(unit = select_unit(unit_no)) != nullptr &&
+		!dsj1_holdoff() &&
+		is_lba_ok()) {
+		buffer = unit->read_img();
+		clear_errors();
+		set_seq_state(new_state);
+	}
 }
 
 // ********************************************************************************
@@ -1891,6 +2091,8 @@ void DecParallelPoll::exec(DriveState& state)
 void DecDeviceClear::exec(DriveState& state)
 {
 	state.amigo_clear();
+	state.pp_enabled = true;
+	state.set_pp(true);
 }
 
 void UnkTalkCmd::exec(DriveState& state)
@@ -1900,9 +2102,18 @@ void UnkTalkCmd::exec(DriveState& state)
 
 void TalkSendData::exec(DriveState& state)
 {
-	if (state.require_seq_state(DriveState::CmdSeqState::SEQ_WAIT_SEND_DATA, true)) {
+	if (state.cmd_seq_state != DriveState::CmdSeqState::SEQ_WAIT_SEND_DATA &&
+		state.cmd_seq_state != DriveState::CmdSeqState::SEQ_WAIT_SD_URD) {
+		state.set_seq_error(true);
+	} else {
 		state.io.send_data(state.buffer);
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_IDLE;
+		state.io.send_checkpoint();
+		if (state.cmd_seq_state == DriveState::CmdSeqState::SEQ_WAIT_SD_URD) {
+			state.set_seq_state(DriveState::CmdSeqState::SEQ_WAIT_CP_URD);
+			state.pp_enabled = false;
+		} else {
+			state.set_seq_state(DriveState::CmdSeqState::SEQ_IDLE);
+		}
 	}
 }
 
@@ -1910,7 +2121,9 @@ void TalkSendStatus::exec(DriveState& state)
 {
 	if (state.require_seq_state(DriveState::CmdSeqState::SEQ_WAIT_SEND_STATUS, true)) {
 		state.io.send_data(state.status);
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_IDLE;
+		state.io.send_end_byte(1);
+		state.io.send_checkpoint();
+		state.set_seq_state(DriveState::CmdSeqState::SEQ_IDLE);
 	}
 }
 
@@ -1928,17 +2141,24 @@ void TalkDSJ::exec(DriveState& state)
 void UnkListenCmd::exec(DriveState& state)
 {
 	state.set_error(DriveState::ERROR_IO);
-	state.cmd_seq_state = DriveState::CmdSeqState::SEQ_IDLE;
+	state.set_seq_state(DriveState::CmdSeqState::SEQ_IDLE);
 }
 
 void ListenReceiveData::exec(DriveState& state)
 {
-	if (state.require_seq_state(DriveState::CmdSeqState::SEQ_WAIT_RECEIVE_DATA, false)) {
+	if (state.cmd_seq_state != DriveState::CmdSeqState::SEQ_WAIT_RECEIVE_DATA &&
+		state.cmd_seq_state != DriveState::CmdSeqState::SEQ_WAIT_RD_UWR) {
+		state.set_seq_error(false);
+	} else if (!state.is_lba_ok()) {
+		state.set_seq_state(DriveState::CmdSeqState::SEQ_IDLE);
+	} else {
 		UnitState& unit = state.get_current_unit();
 		state.buffer = std::move(data);
 		unit.write_img(state.buffer);
 		state.clear_errors();
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_IDLE;
+		if (state.cmd_seq_state == DriveState::CmdSeqState::SEQ_WAIT_RECEIVE_DATA) {
+			state.set_seq_state(DriveState::CmdSeqState::SEQ_IDLE);
+		}
 	}
 }
 
@@ -1984,7 +2204,7 @@ void ListenReqStatus::exec(DriveState& state)
 		unit->f_bit() = false;
 		unit->c_bit() = false;
 		state.clear_errors();
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_WAIT_SEND_STATUS;
+		state.set_seq_state(DriveState::CmdSeqState::SEQ_WAIT_SEND_STATUS);
 	}
 }
 
@@ -2013,7 +2233,7 @@ void ListenReqLogAddr::exec(DriveState& state)
 		CHS current_chs = CHS::from_lba(current_lba, state.fixed_data.geometry);
 		current_chs.to_byte_repr(state.status.data());
 		state.clear_errors();
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_WAIT_SEND_STATUS;
+		state.set_seq_state(DriveState::CmdSeqState::SEQ_WAIT_SEND_STATUS);
 	}
 }
 
@@ -2029,27 +2249,22 @@ void ListenEnd::exec(DriveState& state)
 
 void ListenBuffWr::exec(DriveState& state)
 {
-	if (state.require_seq_state(DriveState::CmdSeqState::SEQ_IDLE, false) &&
-		state.is_dsj_ok() &&
-		state.select_unit(my_unit) != nullptr &&
-		!state.dsj1_holdoff() &&
-		state.is_lba_ok()) {
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_WAIT_RECEIVE_DATA;
-	}
+	state.common_write(my_unit, DriveState::CmdSeqState::SEQ_WAIT_RECEIVE_DATA);
+}
+
+void ListenUnbuffWr::exec(DriveState &state)
+{
+	state.common_write(my_unit, DriveState::CmdSeqState::SEQ_WAIT_RD_UWR);
 }
 
 void ListenBuffRd::exec(DriveState& state)
 {
-	UnitState *unit;
-	if (state.require_seq_state(DriveState::CmdSeqState::SEQ_IDLE, false) &&
-		state.is_dsj_ok() &&
-		(unit = state.select_unit(my_unit)) != nullptr &&
-		!state.dsj1_holdoff() &&
-		state.is_lba_ok()) {
-		state.buffer = unit->read_img();
-		state.clear_errors();
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_WAIT_SEND_DATA;
-	}
+	state.common_read(my_unit, DriveState::CmdSeqState::SEQ_WAIT_SEND_DATA);
+}
+
+void ListenUnbuffRd::exec(DriveState &state)
+{
+	state.common_read(my_unit, DriveState::CmdSeqState::SEQ_WAIT_SD_URD);
 }
 
 void ListenFormat::exec(DriveState& state)
@@ -2069,7 +2284,32 @@ void ListenFormat::exec(DriveState& state)
 void ListenAmigoClear::exec(DriveState& state)
 {
 	if (state.require_seq_state(DriveState::CmdSeqState::SEQ_IDLE, false)) {
-		state.cmd_seq_state = DriveState::CmdSeqState::SEQ_WAIT_CLEAR;
+		state.set_seq_state(DriveState::CmdSeqState::SEQ_WAIT_CLEAR);
+		state.pp_enabled = false;
+	}
+}
+
+void DecCPReachedCmd::exec(DriveState &state)
+{
+	if (state.cmd_seq_state == DriveState::CmdSeqState::SEQ_WAIT_CP_URD) {
+		if (flushed) {
+			state.set_seq_state(DriveState::CmdSeqState::SEQ_IDLE);
+			state.pp_enabled = true;
+		} else {
+			UnitState& unit = state.get_current_unit();
+			if (state.is_lba_ok()) {
+				state.buffer = unit.read_img();
+				state.io.send_data(state.buffer);
+				state.io.send_checkpoint();
+				state.pp_enabled = false;
+			} else {
+				state.io.send_end_byte(1);
+				state.io.send_checkpoint();
+				state.set_seq_state(DriveState::CmdSeqState::SEQ_IDLE);
+				state.pp_enabled = true;
+			}
+		}
+		state.set_pp(true);
 	}
 }
 
