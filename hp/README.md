@@ -43,7 +43,7 @@ Use these options on the MAME command line:
 
 When emulating an HP9895 drive, the first unit is referred to as `:H7` and the second one as `:H7,0,1`.
 
-### Usage on HP85
+#### Usage on HP85
 
 Use these options on the MAME command line:
 
@@ -51,7 +51,7 @@ Use these options on the MAME command line:
 
 When emulating an HP9895 drive, the first unit is referred to as `:D700` and the second one as `:D701`.
 
-### Usage on HP64000
+#### Usage on HP64000
 
 Use these options on the MAME command line:
 
@@ -67,7 +67,7 @@ Once the emulation has started, bring up the UI and activate the cheat.
 
 The cheat is not strictly necessary as the system will usually recover from missed DSJs. However, disk I/O slows down considerably when access is retried.
 
-### Usage on HP IPC
+#### Usage on HP IPC
 
 Use these options on the MAME command line:
 
@@ -84,7 +84,7 @@ If you want to create an image from scratch you need to format it before files c
    5. (Optionally) Press F3 to set the image name,
    6. Press F1 to start the format operation.
 
-### Usage on HP 9000/3xx
+#### Usage on HP 9000/3xx
 
 Use these options on the MAME command line:
 
