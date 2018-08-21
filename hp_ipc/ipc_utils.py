@@ -23,6 +23,7 @@ import itertools
 import time
 import os
 import os.path
+import copy
 
 SECTOR_SIZE=256
 SEC_HEADER=0
@@ -253,10 +254,11 @@ class MountedImage:
             for e in d.entries:
                 dir_inode = self.get_inode(e[ 0 ])
                 if dir_inode.get_file_type() == 'd' and e[ 1 ] != "." and e[ 1 ] != "..":
-                    if not accum_path.endswith(PATH_SEP):
-                        accum_path += PATH_SEP
-                    accum_path += e[ 1 ]
-                    self._ls(dir_inode , accum_path , True)
+                    new_accum_path = copy.copy(accum_path)
+                    if not new_accum_path.endswith(PATH_SEP):
+                        new_accum_path += PATH_SEP
+                    new_accum_path += e[ 1 ]
+                    self._ls(dir_inode , new_accum_path , True)
 
     def ls_directory(self, path , recursive):
         if not path:
