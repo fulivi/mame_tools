@@ -1,6 +1,10 @@
 Tools for MAME emulation of HP systems
 ======================================
 
+## hp disk
+
+The "HP disk" tool is described in its own README file (see `hp_disk` directory).
+
 ## amigo_drive
 
 This tool emulates an HP drive implementing the so-called "Amigo" protocol. It connects to a HP system running in MAME through the IEEE-488 remotizer. The following drives are emulated.
