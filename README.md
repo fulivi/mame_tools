@@ -8,6 +8,8 @@ They mostly have something to do with the emulators I wrote. At the moment they 
 - HP 64000 (`hp64k`)
 - HP 9845 (`hp9845b`, `hp9845c`, `hp9845t`)
 - HP 85A (`hp85`)
+- HP 86B (`hp86b`)
 - HP 2645A (`hp2645`)
+- HP 9825 (`hp9825b`, `hp9825t`)
 
 F. Ulivi (fulivi at big "G" mail, if you know what I mean).

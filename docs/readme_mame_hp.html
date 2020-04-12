@@ -1,0 +1,2283 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.14: http://docutils.sourceforge.net/" />
+<title>Notes on running HP machines in MAME</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 7952 2016-07-26 18:15:59Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+
+See http://docutils.sf.net/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+.subscript {
+  vertical-align: sub;
+  font-size: smaller }
+
+.superscript {
+  vertical-align: super;
+  font-size: smaller }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left, table.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right, table.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+.align-top    {
+  vertical-align: top }
+
+.align-middle {
+  vertical-align: middle }
+
+.align-bottom {
+  vertical-align: bottom }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: grey; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="notes-on-running-hp-machines-in-mame">
+<h1 class="title">Notes on running HP machines in MAME</h1>
+
+<p>Author: F.Ulivi</p>
+<p>License: CC-BY-SA</p>
+<p>This is a brief introduction to emulating HP machines on MAME.</p>
+<p>This is a list of the HP systems for which I wrote (partially/entirely) the MAME emulation:</p>
+<ul class="simple">
+<li><a class="reference internal" href="#hp85a">HP85A</a></li>
+<li><a class="reference internal" href="#hp86b">HP86B</a></li>
+<li><a class="reference internal" href="#hp9845b-c-t">HP9845B/C/T</a></li>
+<li><a class="reference internal" href="#hp64000">HP64000</a></li>
+<li><a class="reference internal" href="#hp2645">HP2645</a></li>
+<li><a class="reference internal" href="#hp9825b-t">HP9825B/T</a></li>
+<li><a class="reference internal" href="#hp-integral-pc">HP Integral PC</a></li>
+</ul>
+<p>I also implemented these peripherals:</p>
+<ul class="simple">
+<li>HP9885 (High-level emulation only, no ROM dump is apparently available)</li>
+<li>HP9895</li>
+</ul>
+<div class="section" id="general-usage-info">
+<h1>General usage info</h1>
+<p>See also: <a class="reference external" href="https://docs.mamedev.org">https://docs.mamedev.org</a></p>
+<p>MAME operates in two modes: PARTIAL &amp; FULL emulation. By default the key to switch between the modes is &quot;Scroll Lock&quot;. In Partial emulation mode, a few keys are diverted to control the MAME UI:</p>
+<dl class="docutils">
+<dt><tt class="docutils literal">Tab</tt></dt>
+<dd>Open/close the UI</dd>
+<dt><tt class="docutils literal">P</tt></dt>
+<dd>Pause/unpause the emulation</dd>
+<dt><tt class="docutils literal">Esc</tt></dt>
+<dd>Quit MAME/go up one menu level</dd>
+<dt>Arrows</dt>
+<dd>Navigate menus/submenus &amp; change settings</dd>
+<dt><tt class="docutils literal">F3</tt></dt>
+<dd>Soft reset the machine</dd>
+</dl>
+<p>The UI is organized in menus &amp; submenus. These are the most important menus, IMO:</p>
+<ul class="simple">
+<li><tt class="docutils literal">Input (this machine)</tt>: Defines the association between keys on your keyboard and keys of the emulated machine.</li>
+<li><tt class="docutils literal">Dip Switches</tt>: Defines the setting of various DIP switches in the system</li>
+<li><tt class="docutils literal">Machine Configuration</tt>: Defines various settings of the emulation environment (e.g. the baudrate to interface RS232 to a PTY)</li>
+<li><tt class="docutils literal">File Manager</tt>: Allows loading/unloading/creating the image files of floppies and tapes</li>
+<li><tt class="docutils literal">Pseudo Terminals</tt>: Reports the device name of active PTYs</li>
+<li><tt class="docutils literal">Slot Devices</tt>: Controls &quot;pluggable&quot; options (such as external modules, connectors, etc)</li>
+</ul>
+<p>ROM images are to be stored in zip files having a well-defined name (see below). The directory where zip files are stored is to be specified with the <tt class="docutils literal">rompath</tt> option.</p>
+<p>Keep in mind that the zip files holding optional ROM images should be stored in a sub-directory with a well-defined name (e.g. <tt class="docutils literal">hp85_rom</tt> for HP85 optional ROMs).</p>
+<p>There are some useful options for general use:</p>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">-debug</span></tt>: enables the integrated (and very powerful) MAME debugger.</li>
+<li><tt class="docutils literal"><span class="pre">-log</span></tt>: logs special messages about the running system into <tt class="docutils literal">error.log</tt>. The nature &amp; amount of these messages depend of the emulated system.</li>
+<li><tt class="docutils literal"><span class="pre">-window</span></tt>: run in a window (as opposed to full screen).</li>
+</ul>
+</div>
+<div class="section" id="emulating-hpib-disks">
+<h1>Emulating HPIB disks</h1>
+<p>Emulation of HPIB disks in MAME is done in two different ways:</p>
+<ol class="arabic simple">
+<li>Low-level emulation of drive inside MAME. Currently there are just two models available: HP9895 &amp; HP9122C. I wrote the emulation of the former.</li>
+<li>External high-level emulation of drive. In this case the IEEE-488 bus is exported outside MAME by the &quot;IEEE488 remotizer&quot; module. This module interfaces with external programs through a TCP socket. I wrote a couple of programs to emulate Amigo drives: <tt class="docutils literal">amigo_drive</tt> and <tt class="docutils literal">hp_disk</tt> (see <a class="reference external" href="https://github.com/fulivi/mame_tools">repository on Github</a>). The latter is GUI based and generally easier to use.</li>
+</ol>
+<p>In either case the emulated system needs to have a HPIB port just like in the real world. It can be integrated (as in HP64000) or provided by an optional module (e.g. HP85). In the latter case the module needs to be virtually &quot;plugged&quot; into an I/O slot. The examples listed below detail the options needed to load HPIB modules, where applicable.</p>
+</div>
+<div class="section" id="hp85a">
+<h1>HP85A</h1>
+<div class="section" id="what-is-implemented">
+<h2>What is implemented</h2>
+<ul class="simple">
+<li>Base system with 16k of RAM</li>
+<li>Internal printer</li>
+<li>DC100 tape drive</li>
+<li>Optional ROMs</li>
+<li>External modules: HP82937 &amp; HP82939</li>
+</ul>
+</div>
+<div class="section" id="rom-images">
+<h2>ROM images</h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="50%" />
+<col width="15%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system</p>
+<p class="last"><tt class="docutils literal">hp85.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">9c402544</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">prt_chrgen.bin</tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">abeaba27</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom000.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">e13b8ae3</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys1.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">7724b1e9</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys2.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">50a85263</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys3.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">0df385f0</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils" id="hp85-images">
+<colgroup>
+<col width="49%" />
+<col width="15%" />
+<col width="36%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">HP82937 module</p>
+<p class="last"><tt class="docutils literal">hp82937.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1820-2437.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">687d1559</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="49%" />
+<col width="15%" />
+<col width="36%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">HP82939 module</p>
+<p class="last"><tt class="docutils literal">hp82939.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1820-2438.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">3a2f42a2</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="50%" />
+<col width="15%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">HP9895 drive</p>
+<p class="last"><tt class="docutils literal">hp9895.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1818-1391a.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">b50dbfb5</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils" id="hp85-optroms">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Assembler Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp85_rom/assembler.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom050.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">9827cc3c</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="38%" />
+<col width="19%" />
+<col width="44%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">I/O Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp85_rom/io.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom300</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">6f904a4c</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Mass storage Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp85_rom/mass.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom320.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">9c03582c</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="38%" />
+<col width="19%" />
+<col width="44%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Matrix Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp85_rom/matrix.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom260</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">70f83074</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Service Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp85_rom/service.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom340.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">41441333</tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="how-to-invoke-mame">
+<h2>How to invoke MAME</h2>
+<p>Base:</p>
+<pre class="literal-block">
+mess64 hp85 -rompath &lt;ROM directory&gt;
+</pre>
+<p>To load optional ROMS:</p>
+<pre class="literal-block">
+-rom1..6 &lt;ROM name&gt;
+</pre>
+<p>Where &lt;ROM name&gt; is &quot;service&quot;, &quot;assembler&quot;, &quot;matrix&quot; , &quot;io&quot;, &quot;mass&quot; (i.e. the name of the image ZIP file, see <a class="reference internal" href="#hp85-optroms">above</a>).</p>
+<p>To load a tape image:</p>
+<pre class="literal-block">
+-magt &lt;HTI file name&gt;
+</pre>
+<p>(To create an empty tape file, use the &quot;file manager&quot; entry in MAME UI. A newly-created
+file is just like a virgin tape, it needs to be formatted before 1st use)</p>
+<p>To redirect the printer output to image files:</p>
+<pre class="literal-block">
+-bitb1 &lt;output file for graphic image&gt; -bitb2 &lt;output file for text&gt;
+</pre>
+<p>To add 82937 module:</p>
+<pre class="literal-block">
+-slot1..4 82937_hpib
+</pre>
+<p>To add HP9895 drive once 82937 is loaded:</p>
+<pre class="literal-block">
+-slot1:82937_hpib:ieee_dev hp9895
+</pre>
+<p>(Use the same slot number as the one used to load the 82937 module)</p>
+<p>Once HP9895 is loaded, use these options to load floppy images:</p>
+<pre class="literal-block">
+-flop1 &lt;image for drive 0&gt; -flop2 &lt;image for drive 1&gt;
+</pre>
+<p>To interface to an external program through the IEEE488 remotizer, using 1234 TCP port:</p>
+<pre class="literal-block">
+-slot1:82937_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234
+</pre>
+<p>Note that the &quot;bitb&quot; indexes of printer output shift up by 1 once the remotizer is in use (so they become <tt class="docutils literal"><span class="pre">-bitb2</span></tt> and <tt class="docutils literal"><span class="pre">-bitb3</span></tt>).</p>
+<p>To add 82939 module:</p>
+<pre class="literal-block">
+-slot1..4 82939_serial
+</pre>
+<p>To connect serial line to something once 82939 is loaded (e.g. a PTY):</p>
+<pre class="literal-block">
+-slot1:82939_serial:rs232 pty
+</pre>
+<p>(Use the same slot number as the one used to load the 82939 module. See also
+&quot;machine configuration&quot; and &quot;pseudo terminals&quot; in MAME UI.)</p>
+<p><strong>Example</strong> Start HP85A with Mass storage ROM, HP82937, HP9895 drive and &quot;85GamesPac1.mfi&quot; image in drive #0:</p>
+<pre class="literal-block">
+mess64 hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_hpib:ieee_dev hp9895 -flop1 85GamesPac1.mfi
+</pre>
+</div>
+</div>
+<div class="section" id="hp86b">
+<h1>HP86B</h1>
+<div class="section" id="id1">
+<h2>What is implemented</h2>
+<ul class="simple">
+<li>Base system with 128k of RAM</li>
+<li>Video output with 82913 aspect ratio</li>
+<li>Run light</li>
+<li>Optional ROMs</li>
+<li>Internal HPIB interface</li>
+<li>External modules: HP82900 &amp; HP82939</li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h2>ROM images</h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="49%" />
+<col width="15%" />
+<col width="36%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system</p>
+<p class="last"><tt class="docutils literal">hp86b.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1820-2437.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">687d1559</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>1280</td>
+<td><tt class="docutils literal">e90fad22</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom000.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">c3ca5c54</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom001.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">59a1616c</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom320.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">c921e2e4</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom321.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">e6e5cc91</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys1.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">bfa473b8</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys2.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">2bc3ba4b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys3.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">86bf3b8b</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="51%" />
+<col width="15%" />
+<col width="34%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">HP82900 module</p>
+<p class="last"><tt class="docutils literal">hp82900.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">82900-60002.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">48745bbb</tt></td>
+</tr>
+</tbody>
+</table>
+<p>For HP82937, HP82939, HP9895 see <a class="reference internal" href="#hp85-images">above</a>.</p>
+<table border="1" class="docutils" id="hp86-optroms">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Advanced Programming 1 Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/advprg1.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom347.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">14c085f8</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Advanced Programming 2 Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/advprg2.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom350.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">0749ced1</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Assembler Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/assembler.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom050.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">bdce8a12</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Enhanced Mass Storage Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/ems.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom317.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">187f7a1e</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">I/O ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/io.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom300.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">c8583a7a</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Matrix 1 Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/matrix1.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom260.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">b57fd7fd</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Matrix 2 Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/matrix2.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom261.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">681c878e</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">MIKSAM Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/miksam.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom016.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">f3639add</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="44%" />
+<col width="17%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Plotter Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp86_rom/plotter.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">rom360.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">982e6ee3</tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="id3">
+<h2>How to invoke MAME</h2>
+<p>Base:</p>
+<pre class="literal-block">
+mess64 hp86b -rompath &lt;ROM directory&gt;
+</pre>
+<p>To load optional ROMS:</p>
+<pre class="literal-block">
+-rom1..6 &lt;ROM name&gt;
+</pre>
+<p>For ROM names see <a class="reference internal" href="#hp86-optroms">above</a>.</p>
+<p>To add HP9895 drive:</p>
+<pre class="literal-block">
+-slot1:hpib:ieee_dev hp9895
+</pre>
+<p>Once HP9895 is loaded, use these options to load floppy images:</p>
+<pre class="literal-block">
+-flop1 &lt;image for drive 0&gt; -flop2 &lt;image for drive 1&gt;
+</pre>
+<p>To interface to an external program through the IEEE488 remotizer, using 1234 TCP port:</p>
+<pre class="literal-block">
+-slot1:hpib:ieee_rem remote488 -bitb socket.localhost:1234
+</pre>
+<p>To add 82900 module:</p>
+<pre class="literal-block">
+-slot2..4 82900_cpm
+</pre>
+<p>To add 82939 module:</p>
+<pre class="literal-block">
+-slot2..4 82939_serial
+</pre>
+<p>To connect serial line to something once 82939 is loaded (e.g. a PTY):</p>
+<pre class="literal-block">
+-slot2:82939_serial:rs232 pty
+</pre>
+<p>(Use the same slot number as the one used to load the 82939 module. See also
+&quot;machine configuration&quot; and &quot;pseudo terminals&quot; in MAME UI.)</p>
+<p><strong>Example</strong> Start HP86B with HP9895 drive and &quot;87demo.hpi&quot; image in drive #0:</p>
+<pre class="literal-block">
+mess64 hp86b -rompath &lt;whatever&gt; -slot1:hpib:ieee_dev hp9895 -flop1 87demo.hpi
+</pre>
+</div>
+<div class="section" id="notes">
+<h2>Notes</h2>
+<p>Due to a race condition, HP9895 drive is not automatically detected at boot time. In order to access it you need to type:</p>
+<pre class="literal-block">
+MASS STORAGE IS &quot;:d700&quot;
+</pre>
+</div>
+</div>
+<div class="section" id="hp9845b-c-t">
+<h1>HP9845B/C/T</h1>
+<p>See also: <a class="reference external" href="https://www.hp9845.net/9845/projects/emulator/">https://www.hp9845.net/9845/projects/emulator/</a></p>
+<div class="section" id="id4">
+<h2>What is implemented</h2>
+<ul class="simple">
+<li>45B, 45C &amp; 45T systems with a variable amount of RAM (192k by default)</li>
+<li>Text &amp; graphic screen</li>
+<li>US &amp; German keyboards</li>
+<li>T14 &amp; T15 tape drives</li>
+<li>Light pen on 45C &amp; 45T</li>
+<li>Softkeys on 45C &amp; 45T</li>
+<li>Internal printer</li>
+<li>Optional ROMs</li>
+<li>External modules: HP98032, HP98034, HP98035, HP98046</li>
+</ul>
+</div>
+<div class="section" id="id5">
+<h2>ROM images</h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="64%" />
+<col width="12%" />
+<col width="24%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9845B</p>
+<p class="last"><tt class="docutils literal">hp9845b.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">9845-LPU-Standard-Processor.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">dc266c1b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-PPU-Standard-Graphics.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">f866510f</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">fe9e844f</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">optional_chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">0ecfa63b</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="66%" />
+<col width="11%" />
+<col width="23%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9845B (German)</p>
+<p class="last"><tt class="docutils literal">hp9845b_de.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">9845-LPU-Standard-Processor.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">dc266c1b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-PPU-Standard-Graphics-Ger.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">c968363d</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">fe9e844f</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">optional_chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">0ecfa63b</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="67%" />
+<col width="11%" />
+<col width="22%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9845C</p>
+<p class="last"><tt class="docutils literal">hp9845c.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">9845-LPU-Standard-Processor.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">dc266c1b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-PPU-Color-Enhanced-Graphics.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">96e11edc</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">fe9e844f</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">optional_chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">0ecfa63b</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="69%" />
+<col width="10%" />
+<col width="21%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9845C (German)</p>
+<p class="last"><tt class="docutils literal">hp9845c_de.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">9845-LPU-Standard-Processor.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">dc266c1b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-PPU-Color-Enhanced-Graphics-Ger.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">a7ef79ee</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">fe9e844f</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">optional_chrgen.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">0ecfa63b</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="67%" />
+<col width="11%" />
+<col width="22%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9845T</p>
+<p class="last"><tt class="docutils literal">hp9845t.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1818-1395.bin</span></tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">7b555edf</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-LPU-Standard-Processor.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">dc266c1b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-PPU-Color-Enhanced-Graphics.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">96e11edc</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="69%" />
+<col width="10%" />
+<col width="21%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9845T (German)</p>
+<p class="last"><tt class="docutils literal">hp9845t_de.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1818-1395.bin</span></tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">7b555edf</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-LPU-Standard-Processor.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">dc266c1b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">9845-PPU-Color-Enhanced-Graphics-Ger.bin</span></tt></td>
+<td>65536</td>
+<td><tt class="docutils literal">a7ef79ee</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Integrated printer character generator</p>
+<p class="last"><tt class="docutils literal">hp9845_prt.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1818-2687.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">cce64de8</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils" id="hp9845-io-images">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">HP98034 module</p>
+<p class="last"><tt class="docutils literal">hp98034.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1816-1242.bin</span></tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">301a9f5f</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">HP98035 module</p>
+<p class="last"><tt class="docutils literal">hp98035.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1818-0469.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">e16ab3bc</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">HP98046 module</p>
+<p class="last"><tt class="docutils literal">hp98046.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1820-2431.bin</span></tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">e6a068d6</tt></td>
+</tr>
+</tbody>
+</table>
+<p>For HP9895 drive see <a class="reference internal" href="#hp85-images">above</a>.</p>
+<table border="1" class="docutils" id="hp9845-optroms">
+<colgroup>
+<col width="76%" />
+<col width="8%" />
+<col width="16%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Assembly Development &amp; Execution Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/asmdev.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-65525-17_40-RevA-Assembly_Execution_and_Development.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">ff91e559</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65525-17_50-RevA-Assembly_Execution_and_Development.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">52d8c5b4</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65525-17_60-RevA-Assembly_Execution_and_Development.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">dc79c562</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65525-17_70-RevA-Assembly_Execution_and_Development.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">ce4179ba</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="72%" />
+<col width="9%" />
+<col width="19%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Datacomm Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/datacomm.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-67965-21_00-RevA-Basic_Data_Comm_Async.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">cc82edcd</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-67965-21_10-RevA-Basic_Data_Comm_Async.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">f0dda2fb</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-67965-21_20-RevA-Basic_Data_Comm_Async.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">342f2cca</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-67965-21_30-RevA-Basic_Data_Comm_Async.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">02c5fbf1</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="71%" />
+<col width="10%" />
+<col width="19%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Enhanced Graphics (Rev B) Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/enhgfxb.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">98780-65501-07_20-revb-enhancend_graphics.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">57598821</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">98780-65501-07_30-revb-enhancend_graphics.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">19278727</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">98780-65501-07_40-revb-enhancend_graphics.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">656799f5</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">98780-65501-07_50-revb-enhancend_graphics.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">1d07c692</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">98780-65501-07_60-revb-enhancend_graphics.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">28e39bf6</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="66%" />
+<col width="11%" />
+<col width="23%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Graphics Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/graphics.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-65517-07_30-RevB-Graphics.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">00f49b6e</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65517-07_40-RevB-Graphics.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">511d6c82</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="65%" />
+<col width="12%" />
+<col width="23%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">I/O (rev B) Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/iob.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-65518-13_50-RevB-IO_LPU.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">3d642769</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65518-13_60-RevB-IO_LPU.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">4fc249f8</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65519-09_40-RevB-IO_PPU.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">fb49c7d8</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65519-09_50-RevB-IO_PPU.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">861a77c6</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="68%" />
+<col width="11%" />
+<col width="21%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Mass Storage (rev D) Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/massd.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-65516-11_10-RevD-Mass_Storage.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">1cc55094</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65516-11_20-RevD-Mass_Storage.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">20025674</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-65516-11_30-RevD-Mass_Storage.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">47cc4fa8</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="72%" />
+<col width="9%" />
+<col width="18%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Structured Programming Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/strucprg.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-65528-17_30-RevA-Structured_Programming.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">f2829f93</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="63%" />
+<col width="12%" />
+<col width="25%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Test Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/test.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-66520-45_00-Test_ROM.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">95a5b299</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-66520-45_10-Test_ROM.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">257e4c66</tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="id6">
+<h2>How to invoke MAME</h2>
+<p>Base:</p>
+<pre class="literal-block">
+mess64 hp9845b -rompath &lt;ROM directory&gt;
+mess64 hp9845c -rompath &lt;ROM directory&gt;
+mess64 hp9845t -rompath &lt;ROM directory&gt;
+mess64 hp9845b_de -rompath &lt;ROM directory&gt;
+mess64 hp9845c_de -rompath &lt;ROM directory&gt;
+mess64 hp9845t_de -rompath &lt;ROM directory&gt;
+</pre>
+<p>To load optional ROMS:</p>
+<pre class="literal-block">
+-rom1..8 &lt;ROM name&gt;
+</pre>
+<p>For ROM names see <a class="reference internal" href="#hp9845-optroms">above</a>. I/O Opt ROM has two ROMs: one for PPU (to be loaded with <tt class="docutils literal"><span class="pre">-rom1</span> iob:ppu_rom</tt>) and one for LPU (to be loaded with <tt class="docutils literal"><span class="pre">-rom2</span> iob:lpu_rom</tt>).</p>
+<p>To set different amount of RAM:</p>
+<pre class="literal-block">
+-ram &lt;RAM amount&gt;
+</pre>
+<p>Where &lt;RAM amount&gt; is <tt class="docutils literal">64k</tt> or <tt class="docutils literal">320k</tt> or <tt class="docutils literal">448k</tt>.</p>
+<p>To add 98032 module:</p>
+<pre class="literal-block">
+-slot0..3 98032_gpio
+</pre>
+<p>To connect a HP9885 drive to 98032 module:</p>
+<pre class="literal-block">
+-slot1:98032_gpio:gpio hp9885
+</pre>
+<p>To add 98034 module:</p>
+<pre class="literal-block">
+-slot0..3 98034_hpib
+</pre>
+<p>To connect a HP9895 to 98034 module:</p>
+<pre class="literal-block">
+-slot1:98034_hpib:ieee_dev hp9895
+</pre>
+<p>To interface to an external program through the IEEE488 remotizer, using 1234 TCP port:</p>
+<pre class="literal-block">
+-slot1:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234
+</pre>
+<p>Note that the &quot;bitb&quot; indexes of printer output shift up by 1 once the remotizer is in use (so they become <tt class="docutils literal"><span class="pre">-bitb2</span></tt> and <tt class="docutils literal"><span class="pre">-bitb3</span></tt>).</p>
+<p>To add 98035 module:</p>
+<pre class="literal-block">
+-slot0..3 98035_rtc
+</pre>
+<p>To add 98046 module:</p>
+<pre class="literal-block">
+-slot0..3 98046
+</pre>
+<p>To connect RS232 port of 98046 to PTY:</p>
+<pre class="literal-block">
+-slot1:98046:rs232 pty
+</pre>
+<p>To enable light pen and have it controlled by mouse:</p>
+<pre class="literal-block">
+-lightgun -lightgun_device mouse
+</pre>
+<p>To load a tape image in T15 drive:</p>
+<pre class="literal-block">
+-magt1 &lt;HTI file name&gt;
+</pre>
+<p>To load a tape image in T14 drive:</p>
+<pre class="literal-block">
+-magt2 &lt;HTI file name&gt;
+</pre>
+<p>To set output files for the internal printer:</p>
+<pre class="literal-block">
+-bitb1 &lt;text output file&gt; -bitb2 &lt;graphic output file&gt;
+</pre>
+<p><strong>Example</strong> Start HP9845C with Mass storage ROM, Enhanced Graphic ROM, HP98034, HP9895 drive with &quot;demo.hpi&quot; in drive #0 and enable light pen:</p>
+<pre class="literal-block">
+mess64 hp9845c -rompath &lt;whatever&gt; -lightgun -lightgun_device mouse -slot1 98034_hpib -slot1:98034_hpib:ieee_dev hp9895 -flop1 demo.hpi -rom1 massd -rom2 enhgfxb
+</pre>
+</div>
+</div>
+<div class="section" id="hp64000">
+<h1>HP64000</h1>
+<div class="section" id="id7">
+<h2>What is implemented</h2>
+<ul class="simple">
+<li>Base system with 128k of RAM</li>
+<li>Text screen</li>
+<li>HPIB interface</li>
+<li>RS232 interface</li>
+<li>Dual 5.25&quot; floppy drive</li>
+</ul>
+</div>
+<div class="section" id="id8">
+<h2>ROM images</h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="55%" />
+<col width="15%" />
+<col width="30%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system</p>
+<p class="last"><tt class="docutils literal">hp64k.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">1816_1496_82S191.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">32a52664</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80020.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">ac01b436</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80021.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">74f9d33c</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80022.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">38b2aae5</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80023.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">6b4bc2ce</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80024.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">2e15a1d2</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80025.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">e6353085</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80026.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">a74e834b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">64100_80027.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">b93c0e7a</tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="id9">
+<h2>How to invoke MAME</h2>
+<p>Base:</p>
+<pre class="literal-block">
+mess64 hp64k -rompath &lt;ROM directory&gt;
+</pre>
+<p>To load floppy images:</p>
+<pre class="literal-block">
+-flop1 &lt;image for drive #0&gt; -flop2 &lt;image for drive #1&gt;
+</pre>
+<p>To interface to an external program through the IEEE488 remotizer, using 1234 TCP port:</p>
+<pre class="literal-block">
+-ieee_rem remote488 -bitb socket.localhost:1234
+</pre>
+<p>To connect RS232 port to PTY:</p>
+<pre class="literal-block">
+-rs232 pty
+</pre>
+<p><strong>Example</strong> Start HP64000 with OS images in drive #0 &amp; #1:</p>
+<pre class="literal-block">
+mess64 hp64k -rompath &lt;whatever&gt; -flop1 64000-2.TD0 -flop2 64000-3.TD0
+</pre>
+</div>
+<div class="section" id="id10">
+<h2>Notes</h2>
+<p>The &quot;System source&quot; DIP switch selects what happens at boot time:</p>
+<ul class="simple">
+<li><tt class="docutils literal">Sys bus</tt>: boot from HPIB connected drive</li>
+<li><tt class="docutils literal">Local <span class="pre">storage-addressable</span></tt>: boot from floppies</li>
+<li><tt class="docutils literal">Performance verification</tt>: start built-in diagnostic</li>
+</ul>
+</div>
+</div>
+<div class="section" id="hp2645">
+<h1>HP2645</h1>
+<div class="section" id="id11">
+<h2>What is implemented</h2>
+<ul class="simple">
+<li>Base system with 16k of RAM</li>
+<li>Video with 4 character sets (Standard, Math, Line drawing &amp; big characters)</li>
+<li>RS232 port</li>
+</ul>
+</div>
+<div class="section" id="id12">
+<h2>ROM images</h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system</p>
+<p class="last"><tt class="docutils literal">hp2645.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1816-0612.bin</span></tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">5d7befd6</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1816-0613.bin</span></tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">b6bac431</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1816-0642.bin</span></tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">2b8d151d</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1816-1417.bin</span></tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">e91343a4</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1816-1425.bin</span></tt></td>
+<td>1024</td>
+<td><tt class="docutils literal">69a34fef</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0206.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">788f8464</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0207.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">de7186a9</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0208.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">1eca0ff8</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0209.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">82e02695</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0210.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">a1ebb6ab</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0212.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">50221ec0</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0287.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">717c01a6</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0426.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">9c49fb37</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0448.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">15b09e97</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0512.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">1796f4fc</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">1818-0513.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">416d1a4d</tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="id13">
+<h2>How to invoke MAME</h2>
+<p>Base:</p>
+<pre class="literal-block">
+mess64 hp2645 -rompath &lt;ROM directory&gt;
+</pre>
+<p>To connect RS232 port to PTY:</p>
+<pre class="literal-block">
+-rs232 pty
+</pre>
+</div>
+<div class="section" id="how-to-load-a-binary-program">
+<h2>How to load a binary program</h2>
+<p>To load a binary program (e.g. a game) into emulated terminal follow these steps (Linux only):</p>
+<ul class="simple">
+<li>Connect a PTY to RS232 port (see above)</li>
+<li>Set the baud rate at most at 4800 by using the <tt class="docutils literal">Machine configuration</tt> menu entry. Ensure that the RS232 configuration for the terminal and the PTY match.</li>
+<li>By using the <tt class="docutils literal">Pseudo terminals</tt> menu entry read the current PTY in use (e.g. <tt class="docutils literal">/dev/pts/10</tt>).</li>
+<li>From a shell issue this command: <tt class="docutils literal">cp invade.txt /dev/pts/10</tt>. Adapt this to the file to be loaded and the PTY device.</li>
+<li>Enjoy!</li>
+</ul>
+</div>
+</div>
+<div class="section" id="hp9825b-t">
+<h1>HP9825B/T</h1>
+<div class="section" id="id14">
+<h2>What is implemented</h2>
+<ul class="simple">
+<li>Base system with 24k of RAM (9825B) or 62k of RAM (9825T)</li>
+<li>DC100 tape drive</li>
+<li>Display &amp; run light</li>
+<li>Printer</li>
+<li>Optional ROMs</li>
+<li>External modules: HP98032, HP98034, HP98035</li>
+</ul>
+</div>
+<div class="section" id="id15">
+<h2>ROM images</h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9825B</p>
+<p class="last"><tt class="docutils literal">hp9825b.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">advpgm_t.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">965b5e5a</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">extio_t.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">a708b978</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">genio_t.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">ade1d1ed</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">plot72.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">0a9cb8db</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">string_t.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">b5ca5da5</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">sysrom1.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">fe429268</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">sysrom2.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">96093b5d</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">sysrom3.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">f9470f67</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system HP9825T</p>
+<p class="last"><tt class="docutils literal">hp9825t.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">advpgm_t.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">965b5e5a</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">extio_t.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">a708b978</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">genio_t.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">ade1d1ed</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">plot72.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">0a9cb8db</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">skoalrom.bin</tt></td>
+<td>4096</td>
+<td><tt class="docutils literal">5e8124d5</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">string_t.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">b5ca5da5</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">syspgm.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">8915588f</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">sysrom1.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">fe429268</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">sysrom2.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">96093b5d</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">sysrom3.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">f9470f67</tt></td>
+</tr>
+</tbody>
+</table>
+<p>For HP98034 &amp; HP98035 modules see <a class="reference internal" href="#hp9845-io-images">above</a>.</p>
+<p>For HP9895 drive see <a class="reference internal" href="#hp85-images">above</a>.</p>
+<table border="1" class="docutils" id="hp9825-optroms">
+<colgroup>
+<col width="43%" />
+<col width="19%" />
+<col width="38%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">9885 Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9825b_rom/mass.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">98217a.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">ee41c924</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="43%" />
+<col width="19%" />
+<col width="38%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">9885/9895 Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9825b_rom/mass2.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">98228a.bin</tt></td>
+<td>16384</td>
+<td><tt class="docutils literal">31ce695e</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="45%" />
+<col width="18%" />
+<col width="37%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">SSS Mass Storage Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9825b_rom/sssmass.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">sssmass.bin</tt></td>
+<td>16384</td>
+<td><tt class="docutils literal">95d36297</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="43%" />
+<col width="19%" />
+<col width="38%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Matrix Opt ROM</p>
+<p class="last"><tt class="docutils literal">hp9825b_rom/matrix.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">98211a.bin</tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">2cec553f</tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="id16">
+<h2>How to invoke MAME</h2>
+<p>Base:</p>
+<pre class="literal-block">
+mess64 hp9825b -rompath &lt;ROM directory&gt;
+mess64 hp9825t -rompath &lt;ROM directory&gt;
+</pre>
+<p>To load optional ROMS:</p>
+<pre class="literal-block">
+-rom1..4 &lt;ROM name&gt;
+</pre>
+<p>For ROM names see <a class="reference internal" href="#hp9825-optroms">above</a>.</p>
+<p>To add 98032 module:</p>
+<pre class="literal-block">
+-slot0..2 98032_gpio
+</pre>
+<p>To connect a HP9885 drive to 98032 module:</p>
+<pre class="literal-block">
+-slot1:98032_gpio:gpio hp9885
+</pre>
+<p>Once HP9885 is loaded, use this option to load a floppy image:</p>
+<pre class="literal-block">
+-flop &lt;image file&gt;
+</pre>
+<p>To add 98034 module:</p>
+<pre class="literal-block">
+-slot0..2 98034_hpib
+</pre>
+<p>To connect a HP9895 to 98034 module:</p>
+<pre class="literal-block">
+-slot1:98034_hpib:ieee_dev hp9895
+</pre>
+<p>Once HP9895 is loaded, use these options to load floppy images:</p>
+<pre class="literal-block">
+-flop1 &lt;image for drive 0&gt; -flop2 &lt;image for drive 1&gt;
+</pre>
+<p>To add 98035 module:</p>
+<pre class="literal-block">
+-slot0..2 98035_rtc
+</pre>
+<p>To load a tape image:</p>
+<pre class="literal-block">
+-magt &lt;HTI file name&gt;
+</pre>
+<p>To set output files for the internal printer:</p>
+<pre class="literal-block">
+-bitb1 &lt;text output file&gt; -bitb2 &lt;graphic output file&gt;
+</pre>
+<p><strong>Example</strong> Start HP9825T with 9885/9895 ROM, HP98034, HP9895 with &quot;9825_tests.mfi&quot; image in drive #0 and set files for printer output:</p>
+<pre class="literal-block">
+mess64 hp9825t -rompath &lt;whatever&gt; -rom1 mass2 -slot0 98034_hpib -slot0:98034_hpib:ieee_dev hp9895 -flop1 9825_tests.mfi -bitb1 prt_1.txt -bitb2 prt_2.txt
+</pre>
+</div>
+</div>
+<div class="section" id="hp-integral-pc">
+<h1>HP Integral PC</h1>
+<div class="section" id="id17">
+<h2>What is implemented</h2>
+<ul class="simple">
+<li>Base system with 512k of RAM/512k of ROM</li>
+<li>Graphic screen</li>
+<li>Mouse pointer</li>
+<li>Internal floppy drive</li>
+<li>HPIB interface</li>
+</ul>
+</div>
+<div class="section" id="id18">
+<h2>ROM images</h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="54%" />
+<col width="17%" />
+<col width="29%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system</p>
+<p class="last"><tt class="docutils literal">hp_ipc.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">hp ipc os 82991A.bin</tt></td>
+<td>524288</td>
+<td><tt class="docutils literal">df45a37b</tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="id19">
+<h2>How to invoke MAME</h2>
+<p>Base:</p>
+<pre class="literal-block">
+mess64 hp_ipc -rompath &lt;ROM directory&gt;
+</pre>
+<p>To enable mouse pointer:</p>
+<pre class="literal-block">
+-mouse
+</pre>
+<p>To set 1M of RAM:</p>
+<pre class="literal-block">
+-ram 1M
+</pre>
+<p>To set an image file for the floppy drive:</p>
+<pre class="literal-block">
+-flop &lt;image file&gt;
+</pre>
+<p>To interface to an external program through the IEEE488 remotizer, using 1234 TCP port:</p>
+<pre class="literal-block">
+-ieee_rem remote488 -bitb socket.localhost:1234
+</pre>
+</div>
+<div class="section" id="id20">
+<h2>Notes</h2>
+<p>MAME warns you on start that ROM dump is incorrect. Emulation will run correctly anyway.</p>
+</div>
+</div>
+</div>
+</body>
+</html>
