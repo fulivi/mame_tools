@@ -423,6 +423,7 @@ ul.auto-toc {
 <li>External high-level emulation of drive. In this case the IEEE-488 bus is exported outside MAME by the &quot;IEEE488 remotizer&quot; module. This module interfaces with external programs through a TCP socket. I wrote a couple of programs to emulate Amigo drives: <tt class="docutils literal">amigo_drive</tt> and <tt class="docutils literal">hp_disk</tt> (see <a class="reference external" href="https://github.com/fulivi/mame_tools">repository on Github</a>). The latter is GUI based and generally easier to use.</li>
 </ol>
 <p>In either case the emulated system needs to have a HPIB port just like in the real world. It can be integrated (as in HP64000) or provided by an optional module (e.g. HP85). In the latter case the module needs to be virtually &quot;plugged&quot; into an I/O slot. The examples listed below detail the options needed to load HPIB modules, where applicable.</p>
+<p id="cpm-note"><strong>A note regarding CP/M disks on HP86</strong>: CP/M on HP86 relies on <em>a-priori</em> knowledge of disk geometry. There is a fixed association between drive model and disk geometry. This means that a disk originally imaged on a 82901 must be loaded into an emulated 82901 drive or access to filesystem from CP/M won't work correctly.</p>
 </div>
 <div class="section" id="hp85a">
 <h1>HP85A</h1>
@@ -732,6 +733,7 @@ mess64 hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_
 <li>Optional ROMs</li>
 <li>Internal HPIB interface</li>
 <li>External modules: HP82900 &amp; HP82939</li>
+<li>Non-English keyboard layouts</li>
 </ul>
 </div>
 <div class="section" id="id2">
@@ -743,7 +745,7 @@ mess64 hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_
 <col width="36%" />
 </colgroup>
 <thead valign="bottom">
-<tr><th class="head" colspan="3"><p class="first">Base system</p>
+<tr><th class="head" colspan="3"><p class="first">Base system, English keyboard</p>
 <p class="last"><tt class="docutils literal">hp86b.zip</tt></p>
 </th>
 </tr>
@@ -768,6 +770,124 @@ mess64 hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_
 <tr><td><tt class="docutils literal">rom001.bin</tt></td>
 <td>8192</td>
 <td><tt class="docutils literal">59a1616c</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom320.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">c921e2e4</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom321.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">e6e5cc91</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys1.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">bfa473b8</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys2.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">2bc3ba4b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys3.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">86bf3b8b</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system, 001/002/006 options</p>
+<p class="last"><tt class="docutils literal">hp86b_001.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1820-2437.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">687d1559</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>1280</td>
+<td><tt class="docutils literal">a3d891c2</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom000.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">c3ca5c54</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom001.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">59a1616c</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom030.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">14507bc0</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom320.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">c921e2e4</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom321.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">e6e5cc91</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys1.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">bfa473b8</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys2.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">2bc3ba4b</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">romsys3.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">86bf3b8b</tt></td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="48%" />
+<col width="18%" />
+<col width="35%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Base system, 004/008/009/010/020/021 opt</p>
+<p class="last"><tt class="docutils literal">hp86b_004.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">1820-2437.bin</span></tt></td>
+<td>2048</td>
+<td><tt class="docutils literal">687d1559</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">chrgen.bin</tt></td>
+<td>1280</td>
+<td><tt class="docutils literal">c7d04292</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom000.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">c3ca5c54</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom001.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">59a1616c</tt></td>
+</tr>
+<tr><td><tt class="docutils literal">rom030.bin</tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">14507bc0</tt></td>
 </tr>
 <tr><td><tt class="docutils literal">rom320.bin</tt></td>
 <td>8192</td>
@@ -1025,9 +1145,17 @@ mess64 hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_
 </div>
 <div class="section" id="id3">
 <h2>How to invoke MAME</h2>
-<p>Base:</p>
+<p>Base, standard English keyboard:</p>
 <pre class="literal-block">
 mess64 hp86b -rompath &lt;ROM directory&gt;
+</pre>
+<p>Base, Swedish/Finnish, Danish/Norwegian &amp; Spanish keyboards:</p>
+<pre class="literal-block">
+mess64 hp86b_001 -rompath &lt;ROM directory&gt;
+</pre>
+<p>Base, German, French, Italian, Dutch, Swiss German &amp; Swiss French keyboards:</p>
+<pre class="literal-block">
+mess64 hp86b_004 -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load optional ROMS:</p>
 <pre class="literal-block">
@@ -1046,7 +1174,7 @@ mess64 hp86b -rompath &lt;ROM directory&gt;
 <pre class="literal-block">
 -slot1:hpib:ieee_rem remote488 -bitb socket.localhost:1234
 </pre>
-<p>To add 82900 module:</p>
+<p>To add 82900 module (see also this <a class="reference internal" href="#cpm-note">note</a>):</p>
 <pre class="literal-block">
 -slot2..4 82900_cpm
 </pre>
