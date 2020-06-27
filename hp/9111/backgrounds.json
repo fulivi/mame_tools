@@ -1,0 +1,20 @@
+[
+    {
+        "name" : "draw",
+        "file" : "menu_draw_large.bmp",
+        "ll": { "x": 52, "y": 786 },
+        "ur": { "x": 971, "y": 119 }
+    },
+    {
+        "name" : "draw 9845",
+        "file" : "draw_9845_large.png",
+        "ll": { "x": 0, "y": 721 },
+        "ur": { "x": 919, "y": 54 }
+    },
+    {
+        "name" : "editor",
+        "file" : "menu_editor_large.bmp",
+        "ll": { "x": 52, "y": 786 },
+        "ur": { "x": 971, "y": 119 }
+    }
+]

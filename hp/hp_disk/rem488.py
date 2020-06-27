@@ -56,6 +56,13 @@ class RemotizerMsg(RemotizerEvent):
     def __str__(self):
         return "{}:{:02x}".format(self.msg_type , self.msg_data)
 
+class RemotizerCP(RemotizerEvent):
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "CP"
+
 class RemotizerCPReached(RemotizerEvent):
     def __init__(self, flushed):
         self.flushed = flushed
@@ -71,14 +78,17 @@ class RemotizerDevClear(RemotizerEvent):
         return "Device Clear"
 
 class RemotizerData(RemotizerEvent):
-    def __init__(self , sec_addr , data):
+    def __init__(self , sec_addr , data , end):
         self.sec_addr = sec_addr
         self.data = data
+        self.end = end
 
     def __str__(self):
         s = "Data len={} ".format(len(self.data))
         if self.sec_addr != None:
             s += "SA={:02x}".format(self.sec_addr)
+        if self.end:
+            s += " (END)"
         return s
 
 class RemotizerTalk(RemotizerEvent):
@@ -105,8 +115,32 @@ class RemotizerAddressed(RemotizerEvent):
     def __str__(self):
         return "Addressed={}".format(self.addressed)
 
+class RemotizerSerialPoll(RemotizerEvent):
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "Serial Poll"
+
+class RemotizerSPAS(RemotizerEvent):
+    def __init__(self , enabled):
+        self.enabled = enabled
+
+    def __str__(self):
+        return "SPAS={}".format(self.enabled)
+
+# Debug masks
+DBG_ENQUEUED = 1
+DBG_CMD = 2
+DBG_IN_MSG = 4
+DBG_OUT_MSG = 8
+DBG_SP = 16
+DBG_ALL = 0x1f
+
 class RemotizerIO:
     def _enqueue(self , obj):
+        if self.debug and self.debug_mask & DBG_ENQUEUED:
+            print("Q:{}".format(str(obj)) , file = self.debug)
         with self.cv:
             self.q.append(obj)
             self.cv.notify()
@@ -115,6 +149,7 @@ class RemotizerIO:
         # 0: idle
         # 1: TADS (got MTA)
         # 2: LADS (got MLA)
+        # 3: SPAS
         self.hpib_state = 0
         # 0: NONE
         # 1: PACS
@@ -122,10 +157,20 @@ class RemotizerIO:
         # 3: LPAS
         # 4: UNT
         self.sa_state = 0
+        # 0: NPRS
+        # 1: SRQS
+        # 2: APRS
+        self.sr_state = 0
+        self.rsv_state = False
+        self.srq_state = None
+        self.wait_sb_cp = False
+        self.spms = False
         self.signals = 0x1f
         self.addressed = False
         self.next_event = None
-        self.accum = None
+        self.pp_state = None
+        self.accum = bytearray()
+        self._sr_fsm()
 
     CMDS = {
         0x01 : "GTL",
@@ -161,6 +206,41 @@ class RemotizerIO:
             s = "???"
         print(s , par_msg , file = out)
 
+    def _sr_fsm(self):
+        with self.sr_lock:
+            save = self.sr_state
+            if self.sr_state == 0:
+                # NPRS state
+                if self.rsv_state and self.hpib_state != 3:
+                    self.sr_state = 1
+            elif self.sr_state == 1:
+                # SRQS state
+                if self.hpib_state == 3:
+                    self.sr_state = 2
+                elif not self.rsv_state:
+                    self.sr_state = 0
+            else:
+                # APRS state
+                if self.hpib_state != 3 and not self.rsv_state:
+                    self.sr_state = 0
+            if save != self.sr_state and self.debug and self.debug_mask & DBG_SP:
+                print("SR {}->{}".format(save , self.sr_state) , file = self.debug)
+            # Send SRQ signal
+            srq = self.sr_state == 1
+            if self.srq_state != srq:
+                if self.debug and self.debug_mask & DBG_SP:
+                    print("SRQ {}".format(srq) , file = self.debug)
+                self.srq_state = srq
+                self.send_msg('R' if self.srq_state else 'S' , 8)
+
+    def _send_status_byte(self):
+        b = self.status_byte
+        if self.sr_state == 2:
+            b |= 0x40
+        self.send_msg('D' , b)
+        self.send_checkpoint()
+        self.wait_sb_cp = True
+
     def _set_addressed(self , addressed):
         if addressed != self.addressed:
             self.addressed = addressed
@@ -168,13 +248,13 @@ class RemotizerIO:
 
     def _flush_accum(self):
         if self.accum:
-            self._enqueue(RemotizerData(self.sec_addr , self.accum))
-            self.accum = None
+            self._enqueue(RemotizerData(self.sec_addr , self.accum , False))
+            self.accum = bytearray()
 
     def _fsm488_D(self , msg_data):
         if (self.signals & 1) == 0:
             # Command byte (ATN is asserted)
-            if self.debug:
+            if self.debug and self.debug_mask & DBG_CMD:
                 self._print_cmd(msg_data , self.debug)
             msg_data &= 0x7f
             is_pcg = (msg_data & 0x60) != 0x60
@@ -183,8 +263,6 @@ class RemotizerIO:
             # 08        Group Execute Trigger
             # 09        Take Control
             # 11        Local Lock-Out
-            # 18        SPE
-            # 19        SPD
             # 1f        CFE
             if is_pcg:
                 self.sa_state = 0
@@ -199,6 +277,12 @@ class RemotizerIO:
                 # PPU
                 # TODO:
                 pass
+            elif msg_data == 0x18:
+                # SPE
+                self.spms = True
+            elif msg_data == 0x19:
+                # SPD
+                self.spms = False
             elif msg_data == self.mla:
                 # MLA
                 # -> LADS
@@ -207,7 +291,6 @@ class RemotizerIO:
                 self.sa_state = 3
                 self.next_event = None
                 self._flush_accum()
-                self.accum = bytearray()
                 self.sec_addr = None
                 if not self.has_sa:
                     self._set_addressed(True)
@@ -257,13 +340,12 @@ class RemotizerIO:
             # DAB
             self.accum.append(msg_data)
             if len(self.accum) == 256:
-                self._enqueue(RemotizerData(self.sec_addr , self.accum))
-                self.accum = bytearray()
+                self._flush_accum()
 
     def _fsm488_E(self , msg_data):
         if self.hpib_state == 2 and (self.signals & 1) != 0:
             self.accum.append(msg_data)
-            self._enqueue(RemotizerData(self.sec_addr , self.accum))
+            self._enqueue(RemotizerData(self.sec_addr , self.accum , True))
             self.accum = bytearray()
 
     def _fsm488_J(self , msg_data):
@@ -272,24 +354,60 @@ class RemotizerIO:
 
     def _fsm488_R(self , msg_data):
         # Reset/assert signals
+        save = self.signals
         self.signals &= ~msg_data
+        if save & 1 and not self.signals & 1 and self.hpib_state == 3:
+            # ATN asserted & SPAS
+            # -> TADS
+            self.hpib_state = 1
+            self._sr_fsm()
+            self._enqueue(RemotizerSPAS(False))
 
     def _fsm488_S(self , msg_data):
         # Set/de-assert signals
+        save = self.signals
         self.signals |= msg_data
-        if (self.signals & 1) != 0 and self.next_event != None:
+        if not save & 1 and self.signals & 1:
             # ATN de-asserted
-            self._enqueue(self.next_event)
-            self.next_event = None
+            if self.hpib_state == 1 and self.spms:
+                # -> SPAS
+                self.hpib_state = 3
+                self.next_event = None
+                self._enqueue(RemotizerSPAS(True))
+                with self.sr_lock:
+                    self._sr_fsm()
+                    # Send status byte
+                    self._send_status_byte()
+            if self.next_event != None:
+                self._enqueue(self.next_event)
+                self.next_event = None
 
     def _fsm488_X(self , msg_data):
-        # Checkpoint
-        # Send back "checkpoint reached"
-        self.send_msg('Y' , 0)
+        self._flush_accum()
+        if self.auto_cp:
+            # Send back automatic "checkpoint reached"
+            self.send_msg('Y' , 0)
+        else:
+            # Else defer to module user
+            self._enqueue(RemotizerCP())
 
     def _fsm488_Y(self , msg_data):
         # Checkpoint reached at the far end
-        self._enqueue(RemotizerCPReached(msg_data != 0))
+        if self.wait_sb_cp:
+            # Checkpoint on status byte
+            self.wait_sb_cp = False
+            if not msg_data:
+                self._enqueue(RemotizerSerialPoll())
+            # Ideally, the device should keep sending the status byte if
+            # the controller keeps accepting it. But:
+            # 1. it's very uncommon for the controller to accept more than 1 byte
+            # 2. the repeated sending of the byte introduces a nice race condition
+            #    between sender and controller when it asserts ATN to stop the device
+            # For these reasons we send the status byte just once.
+            #    if self.hpib_state == 3:
+            #        self._send_status_byte()
+        else:
+            self._enqueue(RemotizerCPReached(msg_data != 0))
 
     MSGS = {
         "D" : _fsm488_D,
@@ -353,7 +471,8 @@ class RemotizerIO:
 
     def _conn_close(self ):
         if self.state == 2:
-            self.conn.close()
+            with self.lock:
+                self.conn.close()
             self._enqueue(RemotizerConnection(CONNECTION_CLOSED , None))
             if self.keep_open:
                 self.state = 1
@@ -374,6 +493,7 @@ class RemotizerIO:
             elif self.state == 1:
                 try:
                     self.io.listen(1)
+                    #with self.lock:
                     self.conn , addr = self.io.accept()
                     self.conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                     self._enqueue(RemotizerConnection(CONNECTION_OK , str(addr)))
@@ -384,18 +504,21 @@ class RemotizerIO:
                     self._enqueue(RemotizerConnection(CONNECTION_ERROR , str(e)))
             elif self.state == 2:
                 for msg_type , fsm_fn , data in self._parse_msgs(self._rem_recv(self.conn)):
-                    if self.debug:
-                        self._enqueue(RemotizerMsg(msg_type , data))
+                    if self.debug and self.debug_mask & DBG_IN_MSG:
+                        print("{}:{:02x}<".format(msg_type , data) , file = self.debug)
+                        #self._enqueue(RemotizerMsg(msg_type , data))
                     fsm_fn(self , data)
                 self._conn_close()
             else:
                 return
 
-    def __init__(self , port , has_sa , keep_open = True , * , debug = None):
+    def __init__(self , port , has_sa , keep_open = True , auto_cp = True , * , debug = None , debug_mask = DBG_ALL):
         self.debug = debug
+        self.debug_mask = debug_mask
         self.port = port
         self.has_sa = has_sa
         self.keep_open = keep_open
+        self.auto_cp = auto_cp
         # 0     Create socket
         # 1     Waiting for connection
         # 2     Connected
@@ -403,9 +526,17 @@ class RemotizerIO:
         self.state = 0
         # Set default address to 0
         self.set_address(0)
+        # No default PP response
+        self.pp_mask = 0
+        # This mutex serializes sending of msgs to socket
         self.lock = threading.RLock()
+        self.conn = None
+        # This mutex protects the SR FSM
+        self.sr_lock = threading.RLock()
         self.cv = threading.Condition(self.lock)
         self.q = collections.deque()
+        self._init_488()
+        self.status_byte = 0
         self.th = threading.Thread(target = self.__my_th)
         self.th.daemon = True
         self.th.start()
@@ -430,12 +561,15 @@ class RemotizerIO:
 
     def send_msg(self, msg_type , msg_data):
         b = bytes("{}:{:02x},".format(msg_type , msg_data) , encoding = "ascii")
-        if self.debug:
+        if self.debug and self.debug_mask & DBG_OUT_MSG:
             print("{}:{:02x}>".format(msg_type , msg_data) , file = self.debug)
         try:
             with self.lock:
-                self.conn.sendall(b)
+                if self.conn:
+                    self.conn.sendall(b)
         except ConnectionError:
+            pass
+        except OSError:
             pass
 
     def talk_data(self, data , eoi_at_end = False):
@@ -453,7 +587,21 @@ class RemotizerIO:
         self.pp_mask = pp_mask
 
     def send_pp_state(self , state):
-        self.send_msg("P" , self.pp_mask if state else 0)
+        new_state = self.pp_mask if state else 0
+        if new_state != self.pp_state:
+            self.pp_state = new_state
+            self.send_msg("P" , self.pp_state)
 
     def send_checkpoint(self):
         self.send_msg("X" , 0)
+
+    def send_checkpoint_reached(self , flushed = False):
+        self.send_msg("Y" , int(flushed))
+
+    def set_rsv_state(self , rsv):
+        with self.sr_lock:
+            self.rsv_state = rsv
+            self._sr_fsm()
+
+    def set_status_byte(self , b):
+        self.status_byte = b & 0xbf
