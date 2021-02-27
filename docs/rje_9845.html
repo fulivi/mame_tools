@@ -1,0 +1,668 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.14: http://docutils.sourceforge.net/" />
+<title>Interfacing an IBM S/370 with HP9845</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 7952 2016-07-26 18:15:59Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+
+See http://docutils.sf.net/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+.subscript {
+  vertical-align: sub;
+  font-size: smaller }
+
+.superscript {
+  vertical-align: super;
+  font-size: smaller }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left, table.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right, table.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+.align-top    {
+  vertical-align: top }
+
+.align-middle {
+  vertical-align: middle }
+
+.align-bottom {
+  vertical-align: bottom }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: grey; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="interfacing-an-ibm-s-370-with-hp9845">
+<h1 class="title">Interfacing an IBM S/370 with HP9845</h1>
+
+<p>Author: F.Ulivi</p>
+<p>License: CC-BY-SA</p>
+<div class="section" id="goal">
+<h1>Goal</h1>
+<p>This recipe demonstrates how an IBM mainframe could be remotely accessed by a RJE (Remote Job Entry) utility on a HP9845B.</p>
+<p>The typical setup included:</p>
+<ul class="simple">
+<li>A IBM S/370 system with 2703 &quot;Transmission control component&quot; and an array of synchronous modems;</li>
+<li>MVT OS/360, HASP and some kind of application software of interest to the remote user on the S/370 (e.g. a FORTRAN compiler and related runtime);</li>
+<li>Communication lines between mainframe and user modems (BiSync protocol is used on the lines);</li>
+<li>At user site a synchronous modem and a 2780 or 3780 terminal.</li>
+</ul>
+<p>The &quot;RJE&quot; tool on the HP9845B emulates a 2780/3780 terminal. Synchronous communication with modem is handled by HP98046 module.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This recipe requires <a class="reference external" href="https://github.com/mamedev/mame/pull/7695">PR #7695</a> to be merged in official MAME sources. Without this PR the emulated RS232 port cannot exchange synchronous communication.</p>
+</div>
+</div>
+<div class="section" id="ingredients">
+<h1>Ingredients</h1>
+<ul class="simple">
+<li>Hercules emulator (I used <a class="reference external" href="https://github.com/SDL-Hercules-390/hyperion">SDL-Hercules</a> at version 4.3.0)</li>
+<li>MAME emulator with the following ROM images:<ul>
+<li><tt class="docutils literal">hp9845b.zip</tt> HP9845B base system</li>
+<li><tt class="docutils literal">hp9845_prt.zip</tt> Printer characters</li>
+<li><tt class="docutils literal">hp98034.zip</tt> HP98034 firmware</li>
+<li><tt class="docutils literal">hp98046.zip</tt> HP98046 firmware</li>
+<li><tt class="docutils literal">hp9845b_rom/datacomm.zip</tt> Datacomm optional ROM</li>
+<li><tt class="docutils literal">hp9845b_rom/massd.zip</tt> Mass storage optional ROM</li>
+<li><tt class="docutils literal">hp9845b_rom/bisync.zip</tt> RJE Bisync optional ROM</li>
+</ul>
+</li>
+<li><tt class="docutils literal">2780_listen</tt> utility (available <a class="reference external" href="https://github.com/fulivi/mame_tools/blob/master/hp/RJE/2780_listen.py">here</a>)</li>
+<li><tt class="docutils literal">hp_disk</tt> tool (available <a class="reference external" href="https://github.com/fulivi/mame_tools/tree/master/hp/hp_disk">here</a>)</li>
+<li>The RJE disk image (available <a class="reference external" href="https://github.com/fulivi/mame_tools/blob/master/hp/RJE/rje_disk.hpi">here</a>)</li>
+<li><a class="reference external" href="https://github.com/fulivi/mame_tools/blob/master/hp/RJE/hercules_files.zip">hercules_files.zip</a> file holding various files needed by Hercules</li>
+<li>Python 3.x runtime</li>
+<li>PyQt5 library for <tt class="docutils literal">hp_disk</tt></li>
+</ul>
+</div>
+<div class="section" id="recipe">
+<h1>Recipe</h1>
+<div class="section" id="structure">
+<h2>Structure</h2>
+<div class="figure">
+<object data="bisync.svg" type="image/svg+xml">
+bisync.svg</object>
+</div>
+<p>This figure shows the block diagram of the emulation setup.</p>
+<p>A few notes:</p>
+<ul>
+<li><p class="first"><tt class="docutils literal">2780_listen</tt> is needed to bridge the Hercules and RJE variants of the Bisync protocol. The Hercules side lacks idle characters and CRC bytes whereas RJE on the HP9845 needs them. The <tt class="docutils literal">2780_listen</tt> is there to remove/add these parts as needed. Another function of this utility is to synchronize the bit stream coming from 98046 by identifying pairs of SYN characters.</p>
+</li>
+<li><p class="first">The RJE disk, in addition to the RJE tool itself, holds a couple of useful files:</p>
+<dl class="docutils">
+<dt><tt class="docutils literal">CTL$</tt></dt>
+<dd><p class="first last">Configuration file for this demo</p>
+</dd>
+<dt><tt class="docutils literal">PRIME3</tt></dt>
+<dd><p class="first last">A ready-made FORTRAN program to compute &amp; print all prime numbers less than 500</p>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="hercules-setup">
+<h2>Hercules setup</h2>
+<ol class="arabic simple">
+<li>Install SDL-Hercules from <a class="reference external" href="https://github.com/SDL-Hercules-390/hyperion">https://github.com/SDL-Hercules-390/hyperion</a></li>
+<li>Decompress <tt class="docutils literal">hercules_files.zip</tt> (keeping the structure) into a freshly-made <tt class="docutils literal">os360mvt</tt> directory</li>
+<li>You can either use the pre-built DASD images or build them yourself. In the former case, images are already included in the zip file (<tt class="docutils literal">dasd</tt> directory) and step 4 is not needed. If, on the contrary, you want to build the images, erase all files in <tt class="docutils literal">dasd</tt> directory and proceed to next step.</li>
+<li>To build the DASD images yourself, follow instructions from <a class="reference external" href="http://conmicro.com/hercos360/index.html">http://conmicro.com/hercos360/index.html</a> with the following exceptions:<ul>
+<li>When running stage 1 sysgen step, file <tt class="docutils literal">jcl/stage1.jcl</tt> is to be substituted with <tt class="docutils literal">jcl/stage1_mame.jcl</tt> in order to add the support for a remote BSC line at address 0020.</li>
+<li>Pay special attention to the stage 2 sysgen step: <strong>input for this step comes from the output of the previous step!</strong> (i.e. you have to copy <tt class="docutils literal">pch00d.txt</tt> to <tt class="docutils literal">jcl/stage2.jcl</tt> before running it)</li>
+<li>When building HASP, file <tt class="docutils literal">haspjcl/p01gen.jcl</tt> is to be substituted with <tt class="docutils literal">haspjcl/p01gen_mame.jcl</tt> to have a remote line defined (LNE1)</li>
+<li>Last step (build &amp; install TSO/TCAM) is not needed and can be skipped</li>
+</ul>
+</li>
+</ol>
+</div>
+<div class="section" id="running-hercules">
+<h2>Running Hercules</h2>
+<ol class="arabic">
+<li><p class="first">cd into <tt class="docutils literal">os360mvt</tt> directory (see <a class="reference internal" href="#hercules-setup">Hercules setup</a>)</p>
+</li>
+<li><p class="first">Start Hercules with <tt class="docutils literal">hercules <span class="pre">-f</span> mvt_hasp_mame.cnf</tt></p>
+</li>
+<li><p class="first">Connect a 3270 terminal emulator to TCP port 3270</p>
+</li>
+<li><p class="first">On Hercules console issue <tt class="docutils literal">ipl 350</tt> command to boot OS/360</p>
+</li>
+<li><p class="first">The 3270 terminal should display <tt class="docutils literal">SPECIFY SYSTEM PARAMETERS FOR RELEASE 21.8F MVT</tt>, just press ENTER</p>
+</li>
+<li><p class="first">Reply <tt class="docutils literal">r <span class="pre">00,'no'</span></tt> to <tt class="docutils literal">SPECIFY SYS1.DUMP TAPE UNIT ADDRESS OR NO</tt></p>
+</li>
+<li><p class="first">Reply <tt class="docutils literal">r 00,u</tt> to confirm date &amp; time.</p>
+</li>
+<li><p class="first">Change the display parameters by typing <tt class="docutils literal">k s</tt> and adjusting the resulting line to read</p>
+<p><tt class="docutils literal">K S,DEL=rd,SEG=19,CON=n,RNUM=19,RTME=001</tt></p>
+</li>
+<li><p class="first">Start HASP with <tt class="docutils literal">s hasp</tt></p>
+</li>
+<li><p class="first">The first time you run HASP reply <tt class="docutils literal">r nn,format,noreq</tt> to <tt class="docutils literal">nn $ SPECIFY HASP OPTIONS <span class="pre">--</span> <span class="pre">HASP-II</span> VERSION 4.009762</tt>; just reply <tt class="docutils literal">r nn,noreq</tt> from the second time on</p>
+</li>
+<li><p class="first">Issue the following HASP command to start remote line LNE1: <tt class="docutils literal">$slne1</tt></p>
+</li>
+<li><p class="first">Status of LNE1 can be checked with command <tt class="docutils literal">$dlne1</tt></p>
+</li>
+</ol>
+<div class="figure">
+<img alt="rje_3270_0.png" src="rje_3270_0.png" style="width: 50%;" />
+<p class="caption">3270 console after booting</p>
+</div>
+</div>
+<div class="section" id="running-2780-listen">
+<h2>Running <tt class="docutils literal">2780_listen</tt></h2>
+<p>Just run it in a Python 3 interpreter. It waits for connection from MAME side, then tries to connect to Hercules side. Once connection is lost on either side, it returns to listen for incoming MAME connections (though I haven't tested this looping extensively).</p>
+<p>Control-C stops this utility.</p>
+</div>
+<div class="section" id="starting-hp-disk">
+<h2>Starting <tt class="docutils literal">hp_disk</tt></h2>
+<ol class="arabic simple">
+<li>Start <tt class="docutils literal">hp_disk</tt></li>
+<li>Select 9895 drive model</li>
+<li>Set HPIB address to 0</li>
+<li>Load RJE disk image in unit 0</li>
+</ol>
+<div class="figure">
+<img alt="rje_hp_disk.png" src="rje_hp_disk.png" style="width: 25%;" />
+</div>
+</div>
+<div class="section" id="starting-mame">
+<h2>Starting MAME</h2>
+<ol class="arabic">
+<li><p class="first">Start MAME with the following command line (add other options you may need):</p>
+<pre class="literal-block">
+mess hp9845b -rompath &lt;whatever&gt; -rom1 datacomm -rom2 bisync -rom3 massd -slot0 98034_hpib -slot0:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234 -slot1 98046 -slot1:98046:rs232 rs232_sync_io -bitb2 socket.localhost:2780 -bitb3 print_out.txt
+</pre>
+</li>
+<li><p class="first">Ensure emulated system is configured as shown here:</p>
+</li>
+</ol>
+<img alt="rje_machine_config.png" src="rje_machine_config.png" style="width: 25%;" />
+<ol class="arabic simple" start="3">
+<li>Type <tt class="docutils literal">MASS STORAGE IS &quot;:H7&quot;</tt> and press <tt class="docutils literal">EXECUTE</tt></li>
+<li>Type <tt class="docutils literal">LOAD <span class="pre">&quot;RJE&quot;,1</span></tt> and press <tt class="docutils literal">EXECUTE</tt></li>
+<li>RJE is now ready: see next section for usage.</li>
+</ol>
+<div class="figure">
+<img alt="rje_rje_0.png" src="rje_rje_0.png" style="width: 50%;" />
+<p class="caption">RJE just after starting</p>
+</div>
+</div>
+<div class="section" id="using-rje">
+<h2>Using RJE</h2>
+<p>RJE is a fairly sophisticated 2780/3780 emulator. It's entirely written in HP-BASIC. I couldn't find any manual online so I partially reverse engineered it from BASIC listing.</p>
+<p>This is a summary of what I found.</p>
+<ul class="simple">
+<li>It emulates all the peripherals composing a 2780/3780: keyboard, printer and card reader/punch.</li>
+<li>Terminal peripherals can be mapped freely to HP9845 I/O devices: keyboard, CRT, integrated or HPIB printers and disk files.</li>
+<li>It includes a rudimentary text file editor</li>
+<li>It can be controlled/configured through either the keyboard or a script file</li>
+</ul>
+<p>This table summarizes the actions associated with function keys.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head"><em>Key</em></th>
+<th class="head"><em>Function</em></th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">k0</tt></td>
+<td>Send a line of text</td>
+</tr>
+<tr><td><tt class="docutils literal">k1</tt></td>
+<td>Send a file</td>
+</tr>
+<tr><td><tt class="docutils literal">k2</tt></td>
+<td>Store a line into edited file</td>
+</tr>
+<tr><td><tt class="docutils literal">k3</tt></td>
+<td>Insert a line into edited file</td>
+</tr>
+<tr><td><tt class="docutils literal">k4</tt></td>
+<td>Delete a line from edited file</td>
+</tr>
+<tr><td><tt class="docutils literal">k5</tt></td>
+<td>Replace a line of edited file</td>
+</tr>
+<tr><td><tt class="docutils literal">k6</tt></td>
+<td>Toggle automatic reception</td>
+</tr>
+<tr><td><tt class="docutils literal">k7</tt></td>
+<td>Establish connection</td>
+</tr>
+<tr><td><tt class="docutils literal">k8</tt></td>
+<td>Move to next field</td>
+</tr>
+<tr><td><tt class="docutils literal">k9</tt></td>
+<td>Modify current field</td>
+</tr>
+<tr><td><tt class="docutils literal">k10</tt></td>
+<td>Toggle control script</td>
+</tr>
+<tr><td><tt class="docutils literal">k11</tt></td>
+<td>Define reader configuration</td>
+</tr>
+<tr><td><tt class="docutils literal">k12</tt></td>
+<td>Define printer configuration</td>
+</tr>
+<tr><td><tt class="docutils literal">k13</tt></td>
+<td>Define punch configuration</td>
+</tr>
+<tr><td><tt class="docutils literal">k14</tt></td>
+<td>Define general configuration</td>
+</tr>
+<tr><td><tt class="docutils literal">k15</tt></td>
+<td>Toggle monitor</td>
+</tr>
+<tr><td><tt class="docutils literal">k16</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k0</tt>)</td>
+<td>Toggle EOT insertion</td>
+</tr>
+<tr><td><tt class="docutils literal">k17</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k1</tt>)</td>
+<td>Connection abort</td>
+</tr>
+<tr><td><tt class="docutils literal">k18</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k2</tt>)</td>
+<td>Create a text file</td>
+</tr>
+<tr><td><tt class="docutils literal">k19</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k3</tt>)</td>
+<td>Edit an existing text file</td>
+</tr>
+<tr><td><tt class="docutils literal">k20</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k4</tt>)</td>
+<td>Delete an existing text file</td>
+</tr>
+<tr><td><tt class="docutils literal">k21</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k5</tt>)</td>
+<td>List an existing text file</td>
+</tr>
+<tr><td><tt class="docutils literal">k22</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k6</tt>)</td>
+<td>Copy rest of file when editing</td>
+</tr>
+<tr><td><tt class="docutils literal">k23</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k7</tt>)</td>
+<td>Disconnect</td>
+</tr>
+<tr><td><tt class="docutils literal">k24</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k8</tt>)</td>
+<td>Move to previous field</td>
+</tr>
+<tr><td><tt class="docutils literal">k25</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k9</tt>)</td>
+<td>Modify current field</td>
+</tr>
+<tr><td><tt class="docutils literal">k26</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k10</tt>)</td>
+<td>Define control script</td>
+</tr>
+<tr><td><tt class="docutils literal">k30</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k14</tt>)</td>
+<td>Dump low level tracing</td>
+</tr>
+<tr><td><tt class="docutils literal">k31</tt> (<tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k15</tt>)</td>
+<td>Define monitor configuration</td>
+</tr>
+</tbody>
+</table>
+<p>After RJE starts (see <a class="reference internal" href="#starting-mame">Starting MAME</a>) you can try some canned action by pressing <tt class="docutils literal">k10</tt> to execute pre-compiled <tt class="docutils literal">CTL$</tt> script file and then <tt class="docutils literal">k1</tt> to send <tt class="docutils literal">PRIME3</tt> file over to S/370 for remote processing.
+Once this file has been transferred, RJE receives and prints output from mainframe on internal printer (MAME actually stores it in <tt class="docutils literal">print_out.txt</tt> file).</p>
+<p>The whole processing of <tt class="docutils literal">PRIME3</tt> takes about 2 minutes.</p>
+<div class="figure">
+<img alt="rje_rje_1.png" src="rje_rje_1.png" style="width: 50%;" />
+<p class="caption">RJE after processing <tt class="docutils literal">PRIME3</tt></p>
+</div>
+<div class="figure">
+<img alt="rje_3270_1.png" src="rje_3270_1.png" style="width: 50%;" />
+<p class="caption">3270 console after processing <tt class="docutils literal">PRIME3</tt></p>
+</div>
+</div>
+<div class="section" id="shutting-down">
+<h2>Shutting down</h2>
+<ol class="arabic simple">
+<li>Disconnect RJE from S/370 (press <tt class="docutils literal">SHIFT</tt> +  <tt class="docutils literal">k7</tt> on HP9845)</li>
+<li>Stop MAME</li>
+<li>Stop <tt class="docutils literal">2780_listen</tt></li>
+<li>Close <tt class="docutils literal">hp_disk</tt></li>
+<li>Disable LNE1 line by typing <tt class="docutils literal">$plne1</tt> on 3270 terminal</li>
+<li>Stop HASP with <tt class="docutils literal">$phasp</tt>. Sometimes it replies with <tt class="docutils literal">HASP NOT DORMANT</tt>, just ignore it.</li>
+<li>Stop OS/360 with <tt class="docutils literal">z eod</tt></li>
+<li>Exit Hercules by typing <tt class="docutils literal">quit</tt> at the <tt class="docutils literal">herc <span class="pre">=====&gt;</span></tt> prompt</li>
+<li>Collect your printout (in <tt class="docutils literal">print_out.txt</tt>).</li>
+</ol>
+</div>
+</div>
+<div class="section" id="acknowledgments">
+<h1>Acknowledgments</h1>
+<ul class="simple">
+<li>Mattis Lind for his <a class="reference external" href="https://github.com/MattisLind/alfaskop_emu">Alfaskop project</a>. This project was the main source of inspiration for my demo. Moreover, the idea for <tt class="docutils literal">2780_listen</tt> tool comes directly from his <tt class="docutils literal">BSCBridge</tt>.</li>
+<li>Jay Maynard for his very helpful instructions on installing and running OS/360 on Hercules</li>
+<li>All the people behind the amazing Hercules emulator</li>
+<li>Ansgar Kueckes for all his work on preserving HP9845 <a class="reference external" href="https://www.hp9845.net/">history</a></li>
+</ul>
+</div>
+</div>
+</body>
+</html>
