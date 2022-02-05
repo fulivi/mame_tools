@@ -1,0 +1,443 @@
+<?xml version="1.0"?>
+<!--
+license:CC-BY-SA
+copyright-holders:F. Ulivi
+Hewlett-Packard 9825T Layout
+-->
+<mamelayout version="2">
+  <element name="dotmatrix5dot">
+    <rect>
+      <bounds x="-0.05" width="5.55" y="-0.05" height="1.1" />
+      <color red="0.0" green="0.0" blue="0.0" />
+    </rect>
+    <disk state="0" statemask="0x01">
+      <bounds x="0.0" />
+      <color red="0.25" green="0.25" blue="0.25" />
+    </disk>
+    <disk state="0" statemask="0x02">
+      <bounds x="1.1" />
+      <color red="0.25" green="0.25" blue="0.25" />
+    </disk>
+    <disk state="0" statemask="0x04">
+      <bounds x="2.2" />
+      <color red="0.25" green="0.25" blue="0.25" />
+    </disk>
+    <disk state="0" statemask="0x08">
+      <bounds x="3.3" />
+      <color red="0.25" green="0.25" blue="0.25" />
+    </disk>
+    <disk state="0" statemask="0x10">
+      <bounds x="4.4" />
+      <color red="0.25" green="0.25" blue="0.25" />
+    </disk>
+    <disk statemask="0x01">
+      <bounds x="0.0" />
+    </disk>
+    <disk statemask="0x02">
+      <bounds x="1.1" />
+    </disk>
+    <disk statemask="0x04">
+      <bounds x="2.2" />
+    </disk>
+    <disk statemask="0x08">
+      <bounds x="3.3" />
+    </disk>
+    <disk statemask="0x10">
+      <bounds x="4.4" />
+    </disk>
+  </element>
+
+  <element name="run_light" defstate="0">
+    <disk state="0">
+      <color red="0.25" green="0" blue="0" />
+    </disk>
+    <disk state="1">
+      <color red="1.0" green="0" blue="0" />
+    </disk>
+  </element>
+
+  <element name="yellow_led" defstate="0">
+    <disk state="0">
+      <color red="0.25" green="0.25" blue="0" />
+    </disk>
+    <disk state="1">
+      <color red="1.0" green="1.0" blue="0" />
+    </disk>
+  </element>
+
+  <group name="display">
+    <bounds x="-5" y="0" width="313.8" height="7"/>
+    <element name="run_light" ref="run_light">
+      <bounds x="-5" y="2" width="2" height="2"/>
+    </element>
+    <!-- 32 5x7 characters -->
+    <repeat count="32">
+      <param name="digitidx" start="0" increment="1" />
+      <param name="digit_x" start="0.0" increment="9.8"/>
+      <!-- Each of the 7 rows in a character -->
+      <repeat count="7">
+        <param name="rowidx" start="0" increment="1" />
+        <element name="char_~digitidx~_~rowidx~" ref="dotmatrix5dot" state="0">
+          <bounds x="~digit_x~" y="~rowidx~" width="5" height="1" />
+          <color red="1.0" green="0.0" blue="0.0" />
+        </element>
+      </repeat>
+    </repeat>
+  </group>
+
+  <element name="kbd">
+    <image file="layout.png" />
+  </element>
+
+  <element name="k7" defstate="0">
+    <image file="cassette.png" state="1" />
+  </element>
+
+  <element name="key" />
+
+  <view name="Display &amp; keyboard">
+    <bounds x="0" y="-0.302" height="11.722" width="18.1"  />
+    <element ref="kbd">
+      <bounds x="0" y="-0.302" width="18.1" height="11.722"/>
+    </element>
+    <element ref="key" inputtag="KEY_SHIFT" inputmask="0x4">
+      <bounds x="0.385" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x80000">
+      <bounds x="1.346" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x4">
+      <bounds x="2.308" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x1000000">
+      <bounds x="3.269" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x10000">
+      <bounds x="4.924" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x20000">
+      <bounds x="5.886" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x200">
+      <bounds x="7.541" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x100">
+      <bounds x="8.502" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x800">
+      <bounds x="9.464" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x10000000">
+      <bounds x="10.425" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x2">
+      <bounds x="12.080" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x4">
+      <bounds x="13.042" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x8">
+      <bounds x="14.003" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x10">
+      <bounds x="14.965" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x20">
+      <bounds x="15.926" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x40">
+      <bounds x="16.887" y="3.519" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x20000000">
+      <bounds x="0.385" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x80000000">
+      <bounds x="1.346" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x40000000">
+      <bounds x="2.308" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x8000000">
+      <bounds x="3.269" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x4000">
+      <bounds x="4.924" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x8000">
+      <bounds x="5.886" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x100000">
+      <bounds x="7.541" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x200000">
+      <bounds x="8.502" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x800000">
+      <bounds x="9.464" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x400000">
+      <bounds x="10.425" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x80">
+      <bounds x="12.080" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x100">
+      <bounds x="13.042" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x200">
+      <bounds x="14.003" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x400">
+      <bounds x="14.965" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x800">
+      <bounds x="15.926" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x1000">
+      <bounds x="16.887" y="4.620" width="0.939" height="0.531" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x20000">
+      <bounds x="0.385" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x40000">
+      <bounds x="1.346" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x80000">
+      <bounds x="2.308" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x100000">
+      <bounds x="3.269" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x200000">
+      <bounds x="4.231" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x400000">
+      <bounds x="5.192" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x800000">
+      <bounds x="6.154" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x1000000">
+      <bounds x="7.115" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x2000000">
+      <bounds x="8.076" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x10000">
+      <bounds x="9.038" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x8000000">
+      <bounds x="9.999" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x1000">
+      <bounds x="10.961" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x40000">
+      <bounds x="13.042" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x1">
+      <bounds x="14.003" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x100">
+      <bounds x="14.965" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x200">
+      <bounds x="15.926" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x8000">
+      <bounds x="16.887" y="5.871" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x20000">
+      <bounds x="0.879" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x800000">
+      <bounds x="1.840" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x20">
+      <bounds x="2.802" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x40000">
+      <bounds x="3.763" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x100000">
+      <bounds x="4.724" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x2000000">
+      <bounds x="5.686" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x200000">
+      <bounds x="6.647" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x200">
+      <bounds x="7.609" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x8000">
+      <bounds x="8.570" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x10000">
+      <bounds x="9.532" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x2000">
+      <bounds x="10.493" y="6.927" width="1.406" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x20000000">
+      <bounds x="13.042" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x200000">
+      <bounds x="14.003" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x400000">
+      <bounds x="14.965" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x800000">
+      <bounds x="15.926" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x400">
+      <bounds x="16.887" y="6.927" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY_SHIFT" inputmask="0x2">
+      <bounds x="0.121" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x2">
+      <bounds x="1.083" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x80000">
+      <bounds x="2.044" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x10">
+      <bounds x="3.006" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x40">
+      <bounds x="3.967" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x80">
+      <bounds x="4.928" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x100">
+      <bounds x="5.890" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x400">
+      <bounds x="6.851" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x800">
+      <bounds x="7.813" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x1000">
+      <bounds x="8.774" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x8000000">
+      <bounds x="9.736" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x40000000">
+      <bounds x="10.697" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x20000000">
+      <bounds x="13.042" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x40000">
+      <bounds x="14.003" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x80000">
+      <bounds x="14.965" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x100000">
+      <bounds x="15.926" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x2000">
+      <bounds x="16.887" y="7.982" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY_SHIFT" inputmask="0x1">
+      <bounds x="0.748" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x4000000">
+      <bounds x="1.709" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x1000000">
+      <bounds x="2.671" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x8">
+      <bounds x="3.632" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x400000">
+      <bounds x="4.594" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x4">
+      <bounds x="5.555" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x4000">
+      <bounds x="6.516" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY3" inputmask="0x2000">
+      <bounds x="7.478" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x1000">
+      <bounds x="8.439" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x4000">
+      <bounds x="9.401" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x80000000">
+      <bounds x="10.362" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY_SHIFT" inputmask="0x1">
+      <bounds x="11.324" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x400">
+      <bounds x="13.042" y="9.037" width="0.939" height="2.110" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x8000">
+      <bounds x="14.003" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x10000">
+      <bounds x="14.965" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x20000">
+      <bounds x="15.926" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x800">
+      <bounds x="16.887" y="9.037" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY1" inputmask="0x1">
+      <bounds x="1.709" y="10.092" width="7.669" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x2">
+      <bounds x="9.401" y="10.092" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x2000000">
+      <bounds x="10.362" y="10.092" width="1.900" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x4000">
+      <bounds x="14.003" y="10.092" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x1000000">
+      <bounds x="14.965" y="10.092" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY2" inputmask="0x2000000">
+      <bounds x="15.926" y="10.092" width="0.939" height="1.054" />
+    </element>
+    <element ref="key" inputtag="KEY0" inputmask="0x80">
+      <bounds x="16.887" y="10.092" width="0.939" height="1.054" />
+    </element>
+    <element name="cassette" ref="k7">
+      <bounds x="0.153163" y="0.002581" width="4.35085" height="1.79294"/>
+    </element>
+    <element name="shift_lock" ref="yellow_led">
+      <bounds x="0.54" y="7.28" width="0.2" height="0.2"/>
+    </element>
+    <element name="tape_led" ref="yellow_led">
+      <bounds x="0.619" y="1.348" width="0.2" height="0.2"/>
+    </element>
+    <group ref="display">
+      <bounds x="5.55605" y="0.45" width="7.14708" height="0.199289"  />
+    </group>
+    <screen index="0">
+      <bounds x="14.385" y="-0.302" width="2.246" height="1.225"  />
+    </screen>
+    <element ref="key" inputtag="KEY_SCROLL" inputmask="0x1">
+      <bounds x="17.35" y="0.763" width="0.59" height="0.77" />
+    </element>
+    <element ref="key" inputtag="KEY_SCROLL" inputmask="0x2">
+      <bounds x="17.35" y="-0.007" width="0.59" height="0.77" />
+    </element>
+  </view>
+</mamelayout>

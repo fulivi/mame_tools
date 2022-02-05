@@ -13,6 +13,10 @@ The "HP disk" tool is described in its own README file (see `hp_disk` directory)
 
 This directory contains files & tools for BiSync communication between MAME & Hercules (see [here](https://fulivi.github.io/mame_tools/rje_9845.html) for instructions).
 
+## hp9825t_artwork
+
+This directory contains artwork files for HP9825T.
+
 ## amigo_drive
 
 This tool emulates an HP drive implementing the so-called "Amigo" protocol. It connects to a HP system running in MAME through the IEEE-488 remotizer. The following drives are emulated.
