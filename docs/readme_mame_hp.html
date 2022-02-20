@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<meta name="generator" content="Docutils 0.14: http://docutils.sourceforge.net/" />
+<meta name="generator" content="Docutils 0.16: http://docutils.sourceforge.net/" />
 <title>Notes on running HP machines in MAME</title>
 <style type="text/css">
 
@@ -427,6 +427,7 @@ ul.auto-toc {
 </div>
 <div class="section" id="hp85a">
 <h1>HP85A</h1>
+<a class="reference external image-reference" href="hp85_asteroid.png"><img alt="hp85_asteroid_s.png" src="hp85_asteroid_s.png" /></a>
 <div class="section" id="what-is-implemented">
 <h2>What is implemented</h2>
 <ul class="simple">
@@ -671,7 +672,7 @@ ul.auto-toc {
 <h2>How to invoke MAME</h2>
 <p>Base:</p>
 <pre class="literal-block">
-mess64 hp85 -rompath &lt;ROM directory&gt;
+mess hp85 -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load optional ROMS:</p>
 <pre class="literal-block">
@@ -680,7 +681,7 @@ mess64 hp85 -rompath &lt;ROM directory&gt;
 <p>Where &lt;ROM name&gt; is &quot;service&quot;, &quot;assembler&quot;, &quot;matrix&quot; , &quot;io&quot;, &quot;mass&quot; (i.e. the name of the image ZIP file, see <a class="reference internal" href="#hp85-optroms">above</a>).</p>
 <p>To load a tape image:</p>
 <pre class="literal-block">
--magt &lt;HTI file name&gt;
+-utap &lt;HTI file name&gt;
 </pre>
 <p>(To create an empty tape file, use the &quot;file manager&quot; entry in MAME UI. A newly-created
 file is just like a virgin tape, it needs to be formatted before 1st use)</p>
@@ -718,12 +719,13 @@ file is just like a virgin tape, it needs to be formatted before 1st use)</p>
 &quot;machine configuration&quot; and &quot;pseudo terminals&quot; in MAME UI.)</p>
 <p><strong>Example</strong> Start HP85A with Mass storage ROM, HP82937, HP9895 drive and &quot;85GamesPac1.mfi&quot; image in drive #0:</p>
 <pre class="literal-block">
-mess64 hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_hpib:ieee_dev hp9895 -flop1 85GamesPac1.mfi
+mess hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_hpib:ieee_dev hp9895 -flop1 85GamesPac1.mfi
 </pre>
 </div>
 </div>
 <div class="section" id="hp86b">
 <h1>HP86B</h1>
+<a class="reference external image-reference" href="hp86b_demo.png"><img alt="hp86b_demo_s.png" src="hp86b_demo_s.png" /></a>
 <div class="section" id="id1">
 <h2>What is implemented</h2>
 <ul class="simple">
@@ -1147,15 +1149,15 @@ mess64 hp85 -rompath &lt;whatever&gt; -slot4 82937_hpib -rom1 mass -slot4:82937_
 <h2>How to invoke MAME</h2>
 <p>Base, standard English keyboard:</p>
 <pre class="literal-block">
-mess64 hp86b -rompath &lt;ROM directory&gt;
+mess hp86b -rompath &lt;ROM directory&gt;
 </pre>
 <p>Base, Swedish/Finnish, Danish/Norwegian &amp; Spanish keyboards:</p>
 <pre class="literal-block">
-mess64 hp86b_001 -rompath &lt;ROM directory&gt;
+mess hp86b_001 -rompath &lt;ROM directory&gt;
 </pre>
 <p>Base, German, French, Italian, Dutch, Swiss German &amp; Swiss French keyboards:</p>
 <pre class="literal-block">
-mess64 hp86b_004 -rompath &lt;ROM directory&gt;
+mess hp86b_004 -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load optional ROMS:</p>
 <pre class="literal-block">
@@ -1190,7 +1192,7 @@ mess64 hp86b_004 -rompath &lt;ROM directory&gt;
 &quot;machine configuration&quot; and &quot;pseudo terminals&quot; in MAME UI.)</p>
 <p><strong>Example</strong> Start HP86B with HP9895 drive and &quot;87demo.hpi&quot; image in drive #0:</p>
 <pre class="literal-block">
-mess64 hp86b -rompath &lt;whatever&gt; -slot1:hpib:ieee_dev hp9895 -flop1 87demo.hpi
+mess hp86b -rompath &lt;whatever&gt; -slot1:hpib:ieee_dev hp9895 -flop1 87demo.hpi
 </pre>
 </div>
 <div class="section" id="notes">
@@ -1203,7 +1205,9 @@ MASS STORAGE IS &quot;:d700&quot;
 </div>
 <div class="section" id="hp9845b-c-t">
 <h1>HP9845B/C/T</h1>
+<a class="reference external image-reference" href="hp9845c_demo.png"><img alt="hp9845c_demo_s.png" src="hp9845c_demo_s.png" /></a>
 <p>See also: <a class="reference external" href="https://www.hp9845.net/9845/projects/emulator/">https://www.hp9845.net/9845/projects/emulator/</a></p>
+<p>This page shows how to demo a RJE connection to an emulated IBM S/370 system: <a class="reference external" href="https://fulivi.github.io/mame_tools/rje_9845.html">https://fulivi.github.io/mame_tools/rje_9845.html</a></p>
 <div class="section" id="id4">
 <h2>What is implemented</h2>
 <ul class="simple">
@@ -1215,7 +1219,7 @@ MASS STORAGE IS &quot;:d700&quot;
 <li>Softkeys on 45C &amp; 45T</li>
 <li>Internal printer</li>
 <li>Optional ROMs</li>
-<li>External modules: HP98032, HP98034, HP98035, HP98046</li>
+<li>External modules: HP98032, HP98034, HP98035, HP98036, HP98046</li>
 </ul>
 </div>
 <div class="section" id="id5">
@@ -1767,17 +1771,44 @@ MASS STORAGE IS &quot;:d700&quot;
 </tr>
 </tbody>
 </table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="69%" />
+<col width="10%" />
+<col width="21%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">RJE Bisync ROM</p>
+<p class="last"><tt class="docutils literal">hp9845b_rom/bisync.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">09845-67986-21_40_rje_datacom_bisync.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">59123e07</tt></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">09845-67986-21_50_rje_datacom_bisync.bin</span></tt></td>
+<td>8192</td>
+<td><tt class="docutils literal">a753991a</tt></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section" id="id6">
 <h2>How to invoke MAME</h2>
 <p>Base:</p>
 <pre class="literal-block">
-mess64 hp9845b -rompath &lt;ROM directory&gt;
-mess64 hp9845c -rompath &lt;ROM directory&gt;
-mess64 hp9845t -rompath &lt;ROM directory&gt;
-mess64 hp9845b_de -rompath &lt;ROM directory&gt;
-mess64 hp9845c_de -rompath &lt;ROM directory&gt;
-mess64 hp9845t_de -rompath &lt;ROM directory&gt;
+mess hp9845b -rompath &lt;ROM directory&gt;
+mess hp9845c -rompath &lt;ROM directory&gt;
+mess hp9845t -rompath &lt;ROM directory&gt;
+mess hp9845b_de -rompath &lt;ROM directory&gt;
+mess hp9845c_de -rompath &lt;ROM directory&gt;
+mess hp9845t_de -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load optional ROMS:</p>
 <pre class="literal-block">
@@ -1828,11 +1859,11 @@ mess64 hp9845t_de -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load a tape image in T15 drive:</p>
 <pre class="literal-block">
--magt1 &lt;HTI file name&gt;
+-utap1 &lt;HTI file name&gt;
 </pre>
 <p>To load a tape image in T14 drive:</p>
 <pre class="literal-block">
--magt2 &lt;HTI file name&gt;
+-utap2 &lt;HTI file name&gt;
 </pre>
 <p>To set output files for the internal printer:</p>
 <pre class="literal-block">
@@ -1840,12 +1871,13 @@ mess64 hp9845t_de -rompath &lt;ROM directory&gt;
 </pre>
 <p><strong>Example</strong> Start HP9845C with Mass storage ROM, Enhanced Graphic ROM, HP98034, HP9895 drive with &quot;demo.hpi&quot; in drive #0 and enable light pen:</p>
 <pre class="literal-block">
-mess64 hp9845c -rompath &lt;whatever&gt; -lightgun -lightgun_device mouse -slot1 98034_hpib -slot1:98034_hpib:ieee_dev hp9895 -flop1 demo.hpi -rom1 massd -rom2 enhgfxb
+mess hp9845c -rompath &lt;whatever&gt; -lightgun -lightgun_device mouse -slot1 98034_hpib -slot1:98034_hpib:ieee_dev hp9895 -flop1 demo.hpi -rom1 massd -rom2 enhgfxb
 </pre>
 </div>
 </div>
 <div class="section" id="hp64000">
 <h1>HP64000</h1>
+<a class="reference external image-reference" href="hp64k.png"><img alt="hp64k_s.png" src="hp64k_s.png" /></a>
 <div class="section" id="id7">
 <h2>What is implemented</h2>
 <ul class="simple">
@@ -1918,7 +1950,7 @@ mess64 hp9845c -rompath &lt;whatever&gt; -lightgun -lightgun_device mouse -slot1
 <h2>How to invoke MAME</h2>
 <p>Base:</p>
 <pre class="literal-block">
-mess64 hp64k -rompath &lt;ROM directory&gt;
+mess hp64k -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load floppy images:</p>
 <pre class="literal-block">
@@ -1934,7 +1966,7 @@ mess64 hp64k -rompath &lt;ROM directory&gt;
 </pre>
 <p><strong>Example</strong> Start HP64000 with OS images in drive #0 &amp; #1:</p>
 <pre class="literal-block">
-mess64 hp64k -rompath &lt;whatever&gt; -flop1 64000-2.TD0 -flop2 64000-3.TD0
+mess hp64k -rompath &lt;whatever&gt; -flop1 64000-2.TD0 -flop2 64000-3.TD0
 </pre>
 </div>
 <div class="section" id="id10">
@@ -1949,12 +1981,14 @@ mess64 hp64k -rompath &lt;whatever&gt; -flop1 64000-2.TD0 -flop2 64000-3.TD0
 </div>
 <div class="section" id="hp2645">
 <h1>HP2645</h1>
+<a class="reference external image-reference" href="hp2645_test.png"><img alt="hp2645_test_s.png" src="hp2645_test_s.png" /></a>
 <div class="section" id="id11">
 <h2>What is implemented</h2>
 <ul class="simple">
 <li>Base system with 16k of RAM</li>
 <li>Video with 4 character sets (Standard, Math, Line drawing &amp; big characters)</li>
 <li>RS232 port</li>
+<li>DC100 tape drive</li>
 </ul>
 </div>
 <div class="section" id="id12">
@@ -2047,11 +2081,15 @@ mess64 hp64k -rompath &lt;whatever&gt; -flop1 64000-2.TD0 -flop2 64000-3.TD0
 <h2>How to invoke MAME</h2>
 <p>Base:</p>
 <pre class="literal-block">
-mess64 hp2645 -rompath &lt;ROM directory&gt;
+mess hp2645 -rompath &lt;ROM directory&gt;
 </pre>
 <p>To connect RS232 port to PTY:</p>
 <pre class="literal-block">
 -rs232 pty
+</pre>
+<p>To load a cartridge in U0 drive:</p>
+<pre class="literal-block">
+-utap1 &lt;HTI file name&gt;
 </pre>
 </div>
 <div class="section" id="how-to-load-a-binary-program">
@@ -2064,10 +2102,18 @@ mess64 hp2645 -rompath &lt;ROM directory&gt;
 <li>From a shell issue this command: <tt class="docutils literal">cp invade.txt /dev/pts/10</tt>. Adapt this to the file to be loaded and the PTY device.</li>
 <li>Enjoy!</li>
 </ul>
+<p>Alternatively, a binary program can be loaded from a tape image. The following instructions assume that the file to be loaded is first on tape.</p>
+<ul class="simple">
+<li>Start emulation and load tape image into utap1 drive with File Manager (in UI menu)</li>
+<li>Ensure that terminal is in local mode</li>
+<li>Press <tt class="docutils literal">GOLD</tt>, <tt class="docutils literal">f1</tt> and <tt class="docutils literal">READ</tt></li>
+<li>Reading from tape should start.</li>
+</ul>
 </div>
 </div>
 <div class="section" id="hp9825b-t">
 <h1>HP9825B/T</h1>
+<a class="reference external image-reference" href="hp9825t_layout.png"><img alt="hp9825t_layout_s.png" src="hp9825t_layout_s.png" /></a>
 <div class="section" id="id14">
 <h2>What is implemented</h2>
 <ul class="simple">
@@ -2076,7 +2122,8 @@ mess64 hp2645 -rompath &lt;ROM directory&gt;
 <li>Display &amp; run light</li>
 <li>Printer</li>
 <li>Optional ROMs</li>
-<li>External modules: HP98032, HP98034, HP98035</li>
+<li>External modules: HP98032, HP98034, HP98035, HP98036</li>
+<li>Full layout with keyboard, display, tape drive and printer</li>
 </ul>
 </div>
 <div class="section" id="id15">
@@ -2290,8 +2337,8 @@ mess64 hp2645 -rompath &lt;ROM directory&gt;
 <h2>How to invoke MAME</h2>
 <p>Base:</p>
 <pre class="literal-block">
-mess64 hp9825b -rompath &lt;ROM directory&gt;
-mess64 hp9825t -rompath &lt;ROM directory&gt;
+mess hp9825b -rompath &lt;ROM directory&gt;
+mess hp9825t -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load optional ROMS:</p>
 <pre class="literal-block">
@@ -2328,7 +2375,7 @@ mess64 hp9825t -rompath &lt;ROM directory&gt;
 </pre>
 <p>To load a tape image:</p>
 <pre class="literal-block">
--magt &lt;HTI file name&gt;
+-utap &lt;HTI file name&gt;
 </pre>
 <p>To set output files for the internal printer:</p>
 <pre class="literal-block">
@@ -2336,12 +2383,13 @@ mess64 hp9825t -rompath &lt;ROM directory&gt;
 </pre>
 <p><strong>Example</strong> Start HP9825T with 9885/9895 ROM, HP98034, HP9895 with &quot;9825_tests.mfi&quot; image in drive #0 and set files for printer output:</p>
 <pre class="literal-block">
-mess64 hp9825t -rompath &lt;whatever&gt; -rom1 mass2 -slot0 98034_hpib -slot0:98034_hpib:ieee_dev hp9895 -flop1 9825_tests.mfi -bitb1 prt_1.txt -bitb2 prt_2.txt
+mess hp9825t -rompath &lt;whatever&gt; -rom1 mass2 -slot0 98034_hpib -slot0:98034_hpib:ieee_dev hp9895 -flop1 9825_tests.mfi -bitb1 prt_1.txt -bitb2 prt_2.txt
 </pre>
 </div>
 </div>
 <div class="section" id="hp-integral-pc">
 <h1>HP Integral PC</h1>
+<a class="reference external image-reference" href="hp_ipc_softeng.png"><img alt="hp_ipc_softeng_s.png" src="hp_ipc_softeng_s.png" /></a>
 <div class="section" id="id17">
 <h2>What is implemented</h2>
 <ul class="simple">
@@ -2350,6 +2398,9 @@ mess64 hp9825t -rompath &lt;whatever&gt; -rom1 mass2 -slot0 98034_hpib -slot0:98
 <li>Mouse pointer</li>
 <li>Internal floppy drive</li>
 <li>HPIB interface</li>
+<li>Beeper</li>
+<li>Optional ROM module: Software Engineering</li>
+<li>External modules: HP82919</li>
 </ul>
 </div>
 <div class="section" id="id18">
@@ -2377,12 +2428,35 @@ mess64 hp9825t -rompath &lt;whatever&gt; -rom1 mass2 -slot0 98034_hpib -slot0:98
 </tr>
 </tbody>
 </table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="41%" />
+<col width="23%" />
+<col width="36%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head" colspan="3"><p class="first">Software Engineering ROM</p>
+<p class="last"><tt class="docutils literal">hp_ipc_rom/se.zip</tt></p>
+</th>
+</tr>
+<tr><th class="head">Name</th>
+<th class="head">Size</th>
+<th class="head">CRC</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">se_rom.bin</tt></td>
+<td>2097152</td>
+<td><tt class="docutils literal">58da10cf</tt></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section" id="id19">
 <h2>How to invoke MAME</h2>
 <p>Base:</p>
 <pre class="literal-block">
-mess64 hp_ipc -rompath &lt;ROM directory&gt;
+mess hp_ipc -rompath &lt;ROM directory&gt;
 </pre>
 <p>To enable mouse pointer:</p>
 <pre class="literal-block">
@@ -2399,6 +2473,14 @@ mess64 hp_ipc -rompath &lt;ROM directory&gt;
 <p>To interface to an external program through the IEEE488 remotizer, using 1234 TCP port:</p>
 <pre class="literal-block">
 -ieee_rem remote488 -bitb socket.localhost:1234
+</pre>
+<p>To load Software Engineering optional ROM:</p>
+<pre class="literal-block">
+-rom1 se
+</pre>
+<p>To add 82919 serial line module and connect primary RS232 to pty:</p>
+<pre class="literal-block">
+-slot_a 82919_serial -slot_a:82919_serial:rs232_prim pty
 </pre>
 </div>
 <div class="section" id="id20">
