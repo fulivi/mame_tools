@@ -1,0 +1,7 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource>
+    <file>led-yellow-on.bmp</file>
+    <file>led-yellow-off.bmp</file>
+  </qresource>
+</RCC>
