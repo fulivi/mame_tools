@@ -9,6 +9,14 @@ The "HP disk" tool is described in its own README file (see `hp_disk` directory)
 
 "9111" is an emulator of HP9111A graphic tablet for MAME-emulated systems (see `9111` directory).
 
+## 9872
+
+"9872" is an emulator of HP9872C plotter for MAME-emulated systems (see `9872` directory).
+
+## mux
+
+"mux" is a tool acting as a virtual bus cable for MAME IEEE-488 Remotizer. It allows the connection of more than 1 external device to MAME-emulated systems (see `mux` directory).
+
 ## RJE
 
 This directory contains files & tools for BiSync communication between MAME & Hercules (see [here](https://fulivi.github.io/mame_tools/rje_9845.html) for instructions).
@@ -139,4 +147,3 @@ Follow these steps to use this tool with MAME.
 **Never directly use valuable image files: use a copy instead. Don't trust the tool not to damage the images.**
 
 For your convenience, empty formatted images are available in `empty_images.zip`.
-
