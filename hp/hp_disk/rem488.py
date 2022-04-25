@@ -552,6 +552,17 @@ class RemotizerIO:
     def has_events(self):
         return len(self.q) > 0
 
+    # Events that are returned by this function:
+    # RemotizerConnection   Status of remotizer connection
+    # RemotizerCP           Request for checkpoint received
+    # RemotizerCPReached    Checkpoint received at remote end
+    # RemotizerDevClear     SDC or DCL received
+    # RemotizerData         Listened data
+    # RemotizerTalk         Enabled to talk
+    # RemotizerIdentify     Identify sequence received
+    # RemotizerAddressed    Addressed or unaddressed
+    # RemotizerSerialPoll   Serial poll received
+    # RemotizerSPAS         SPAS state on/off
     def get_event(self , timeout = None):
         with self.cv:
             if self.cv.wait_for(lambda : self.has_events() , timeout):
