@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A GUI based emulator of HP Amigo drives for use with MAME IEEE-488 remotizer
-# Copyright (C) 2020 F. Ulivi <fulivi at big "G" mail>
+# Copyright (C) 2020-2022 F. Ulivi <fulivi at big "G" mail>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -616,3 +616,6 @@ class RemotizerIO:
 
     def set_status_byte(self , b):
         self.status_byte = b & 0xbf
+
+    def force_data(self , data):
+        self._enqueue(RemotizerData(None , data , False))

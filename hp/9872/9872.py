@@ -22,31 +22,45 @@ import plot9872
 import rem488
 import resources
 
+from pen_dialog import Pen_dialog
+
 DEFAULT_PORT = 1234
 DEFAULT_ADDR = 5
 
 class Platen(QtWidgets.QWidget):
-    PENS = [
+    # *****************
+    # **** Signals ****
+    # *****************
+    #
+    # Set file for HPGL logging
+    set_log_file = QtCore.pyqtSignal(QtCore.QFile)
+    # Unset log file
+    unset_log_file = QtCore.pyqtSignal()
+    # Send HPGL playback data
+    playback_data = QtCore.pyqtSignal(bytes)
+
+    DEFAULT_PENS = [
         # 1
-        (QtCore.Qt.GlobalColor.black , 20),
+        (QtGui.QColor(QtCore.Qt.GlobalColor.black) , 20),
         # 2
-        (QtCore.Qt.GlobalColor.red , 20),
+        (QtGui.QColor(QtCore.Qt.GlobalColor.red) , 20),
         # 3
-        (QtCore.Qt.GlobalColor.green , 20),
+        (QtGui.QColor(QtCore.Qt.GlobalColor.green) , 20),
         # 4
-        (QtCore.Qt.GlobalColor.blue , 20),
+        (QtGui.QColor(QtCore.Qt.GlobalColor.blue) , 20),
         # 5
-        (QtCore.Qt.GlobalColor.cyan , 20),
+        (QtGui.QColor(QtCore.Qt.GlobalColor.cyan) , 20),
         # 6
-        (QtCore.Qt.GlobalColor.magenta , 20),
+        (QtGui.QColor(QtCore.Qt.GlobalColor.magenta) , 20),
         # 7
-        (QtCore.Qt.GlobalColor.yellow , 20),
+        (QtGui.QColor(QtCore.Qt.GlobalColor.yellow) , 20),
         # 8
-        (QtCore.Qt.GlobalColor.lightGray , 20)
+        (QtGui.QColor(QtCore.Qt.GlobalColor.lightGray) , 20)
     ]
 
-    def __init__(self , parent):
+    def __init__(self , parent , main_win):
         QtWidgets.QWidget.__init__(self , parent)
+        self.main_win = main_win
         # Each element defines a segment as a tuple:
         # [0]   p1.x
         # [1]   p1.y
@@ -57,12 +71,24 @@ class Platen(QtWidgets.QWidget):
         self.segments = []
         self.xform = None
         self.menu = QtWidgets.QMenu(self)
-        a1 = QtWidgets.QAction("Save" , self.menu)
+        a1 = QtWidgets.QAction("Save.." , self.menu)
         self.menu.addAction(a1)
         a1.triggered.connect(self.menu_save)
         a2 = QtWidgets.QAction("Clear" , self.menu)
         self.menu.addAction(a2)
         a2.triggered.connect(self.menu_clear)
+        self.log_action = QtWidgets.QAction("Log HPGL.." , self.menu)
+        self.menu.addAction(self.log_action)
+        self.log_action.triggered.connect(self.menu_log)
+        self.log_action.setCheckable(True)
+        self.log_file = None
+        self.pbk_action = QtWidgets.QAction("HPGL playback.." , self.menu)
+        self.menu.addAction(self.pbk_action)
+        self.pbk_action.triggered.connect(self.menu_pbk)
+        self.pen_action = QtWidgets.QAction("Set pens.." , self.menu)
+        self.menu.addAction(self.pen_action)
+        self.pen_action.triggered.connect(self.menu_pen)
+        self.pens = self.DEFAULT_PENS
 
     def mousePressEvent(self , event):
         if event.button() == QtCore.Qt.RightButton:
@@ -93,9 +119,44 @@ class Platen(QtWidgets.QWidget):
         self.segments.clear()
         self.update()
 
+    def menu_log(self , action):
+        if self.log_file is None:
+            filename = QtWidgets.QFileDialog.getSaveFileName(self , "Log HPGL" , "" , "Log files (*.log)")
+            f = filename[ 0 ]
+            if f:
+                self.log_file = QtCore.QFile(f)
+                if not self.log_file.open(QtCore.QIODevice.WriteOnly):
+                    QtWidgets.QMessageBox.critical(self , "Error" , "Can't open log file")
+                    self.log_file = None
+                else:
+                    self.set_log_file.emit(self.log_file)
+        else:
+            self.unset_log_file.emit()
+            self.log_file.close()
+            self.log_file = None
+        self.log_action.setChecked(self.log_file is not None)
+        self.pbk_action.setEnabled(self.log_file is None)
+
+    def menu_pbk(self , action):
+        filename = QtWidgets.QFileDialog.getOpenFileName(self , "HPGL playback" , "" , "Log files (*.log);;All files (*.*)")
+        f = filename[ 0 ]
+        if f:
+            pbk_file = QtCore.QFile(f)
+            if not pbk_file.open(QtCore.QIODevice.ReadOnly):
+                QtWidgets.QMessageBox.critical(self , "Error" , "Can't open file")
+            else:
+                pbk_data = pbk_file.readAll().data()
+                self.playback_data.emit(pbk_data)
+
+    def menu_pen(self , action):
+        dlg = Pen_dialog(self.main_win , self.pens , self.DEFAULT_PENS)
+        rt = dlg.exec()
+        if rt == QtWidgets.QDialog.Accepted:
+            self.pens = dlg.get_pen_settings()
+
     # SLOT
     def add_segment(self , s):
-        color , size = self.PENS[ s.pen_no - 1 ]
+        color , size = self.pens[ s.pen_no - 1 ]
         self.segments.append((s.p1.x , s.p1.y , s.p2.x , s.p2.y , color , size))
         self.update()
 
@@ -144,6 +205,39 @@ class Platen(QtWidgets.QWidget):
         painter.setPen(pen)
         painter.drawRect(0 , 0 , plot9872.MAX_X_PHY , plot9872.MAX_Y_PHY)
         self.paint(painter)
+
+    def load_settings(self , settings):
+        settings.beginReadArray("pens")
+        try:
+            pens = []
+            for idx in range(0 , 8):
+                settings.setArrayIndex(idx)
+                v = settings.value("color")
+                if not isinstance(v , QtGui.QColor):
+                    return
+                color = v
+                v = settings.value("size")
+                if v is None:
+                    return
+                try:
+                    size = int(v)
+                except ValueError:
+                    return
+                if not 1 <= size <= 40:
+                    return
+                pens.append((color , size))
+            self.pens = pens
+        finally:
+            settings.endArray()
+
+    def save_settings(self , settings):
+        settings.beginWriteArray("pens")
+        for idx , pen in enumerate(self.pens):
+            settings.setArrayIndex(idx)
+            color , size = pen
+            settings.setValue("color" , color)
+            settings.setValue("size" , size)
+        settings.endArray()
 
 class FixedARLayout(QtWidgets.QLayout):
     def __init__(self , parent , fixed_ar):
@@ -196,6 +290,8 @@ class My_io(QtCore.QThread):
     def __init__(self):
         QtCore.QThread.__init__(self)
         self.plt = plot9872.Plotter(self)
+        self.lock = QtCore.QMutex()
+        self.log_file = None
 
     def set_talk_data(self , data):
         print("Talk:{}".format(data))
@@ -228,6 +324,32 @@ class My_io(QtCore.QThread):
     def set_ol_led(self , state):
         self.ol_led.emit(state)
 
+    def set_log_file(self , f):
+        self.lock.lock()
+        try:
+            self.log_file = f
+        finally:
+            self.lock.unlock()
+
+    def unset_log_file(self):
+        self.lock.lock()
+        try:
+            self.log_file = None
+        finally:
+            self.lock.unlock()
+
+    def log_hpgl(self , data):
+        self.lock.lock()
+        try:
+            if self.log_file is not None:
+                self.log_file.writeData(data)
+        finally:
+            self.lock.unlock()
+
+    # SLOT
+    def playback_data(self , data):
+        self.plt.io_event(rem488.RemotizerData(None , data , False))
+
     def run(self):
         try:
             while True:
@@ -254,6 +376,7 @@ class My_io(QtCore.QThread):
                                     sn.append(ordc - 0x40)
                                 state = 0
                         ev = rem488.RemotizerData(None , sn , False)
+                        self.log_hpgl(sn)
                     elif c == "S":
                         ev = rem488.RemotizerSerialPoll()
                     elif c == "F":
@@ -261,6 +384,7 @@ class My_io(QtCore.QThread):
                             with open(i_s[ 1: ] , "rb") as inp:
                                 data = inp.read()
                                 ev = rem488.RemotizerData(None , data , False)
+                                self.log_hpgl(sn)
                         except IOError:
                             print("I/O error")
                             continue
@@ -300,6 +424,8 @@ class Rem488_io(QtCore.QThread):
         if addr < 8:
             self.rem.set_pp_response(0x80 >> addr)
         self.plt = plot9872.Plotter(self)
+        self.lock = QtCore.QMutex()
+        self.log_file = None
 
     def set_talk_data(self , data):
         self.rem.talk_data(data)
@@ -329,6 +455,34 @@ class Rem488_io(QtCore.QThread):
     def set_ol_led(self , state):
         self.ol_led.emit(state)
 
+    # SLOT
+    def set_log_file(self , f):
+        self.lock.lock()
+        try:
+            self.log_file = f
+        finally:
+            self.lock.unlock()
+
+    # SLOT
+    def unset_log_file(self):
+        self.lock.lock()
+        try:
+            self.log_file = None
+        finally:
+            self.lock.unlock()
+
+    def log_hpgl(self , data):
+        self.lock.lock()
+        try:
+            if self.log_file is not None:
+                self.log_file.writeData(data)
+        finally:
+            self.lock.unlock()
+
+    # SLOT
+    def playback_data(self , data):
+        self.rem.force_data(data)
+
     def run(self):
         while True:
             ev = self.rem.get_event()
@@ -338,12 +492,21 @@ class Rem488_io(QtCore.QThread):
                 self.rem.send_checkpoint_reached()
             else:
                 self.plt.io_event(ev)
+                if isinstance(ev , rem488.RemotizerData):
+                    self.log_hpgl(ev.data)
+
+class Playback(QtCore.QThread):
+    def __init__(self , rem , in_file):
+        pass
+
+    def run(self):
+        pass
 
 class MyMainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         QtWidgets.QWidget.__init__(self , None)
         self.widget = QtWidgets.QWidget(self)
-        self.platen = Platen(self.widget)
+        self.platen = Platen(self.widget , self)
         self.layout = FixedARLayout(self.widget , 1.4)
         self.layout.addWidget(self.platen)
         self.widget.setLayout(self.layout)
@@ -403,6 +566,26 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.blink = not self.blink
         self.led_ol.setPixmap(self.yellow_led_on if self.blink else self.yellow_led_off)
 
+    def closeEvent(self , event):
+        self.save_settings()
+        event.accept()
+
+    def load_settings(self):
+        settings = QtCore.QSettings("9872")
+        settings.beginGroup("MainWindow")
+        geo = settings.value("geometry")
+        if geo:
+            self.restoreGeometry(geo)
+        settings.endGroup()
+        self.platen.load_settings(settings)
+
+    def save_settings(self):
+        settings = QtCore.QSettings("9872")
+        settings.beginGroup("MainWindow")
+        settings.setValue("geometry" , self.saveGeometry())
+        settings.endGroup()
+        self.platen.save_settings(settings)
+
 def get_options(app):
     parser = QtCore.QCommandLineParser()
     parser.addHelpOption()
@@ -432,7 +615,7 @@ def get_options(app):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("HP9872 emulator")
-    app.setApplicationVersion("1.0")
+    app.setApplicationVersion("1.1")
     port , address = get_options(app)
     #my_io = My_io()
     my_io = Rem488_io(port , address)
@@ -441,6 +624,10 @@ if __name__ == '__main__':
     my_io.status_connect.connect(myapp.conn_status)
     my_io.error_led.connect(myapp.error_led)
     my_io.ol_led.connect(myapp.ol_led)
+    myapp.platen.set_log_file.connect(my_io.set_log_file)
+    myapp.platen.unset_log_file.connect(my_io.unset_log_file)
+    myapp.platen.playback_data.connect(my_io.playback_data)
     my_io.start()
+    myapp.load_settings()
     myapp.show()
     sys.exit(app.exec_())

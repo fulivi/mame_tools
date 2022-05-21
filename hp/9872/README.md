@@ -10,6 +10,8 @@
 9872 is composed of the following files:
 
 + `9872.py`
++ `pendialog.py`
++ `pen_dialog.py`
 + `plot9872.py`
 + `resources.py`
 
@@ -25,9 +27,19 @@ These files must be placed in the same directory. The emulator also needs `rem48
 
 The GUI layout is quite simple: most of the window is occupied by the "paper sheet" with plotter output. At the bottom right corner the 2 LED indicators are simulated.
 
-By right-clicking on the sheet a popup menu is shown. There are 2 commands available: `save` to save the current image in SVG format and `clear` to place a new, clean sheet on the plotter plate.
+By right-clicking on the sheet a popup menu is shown. These commands are available:
 
-Pens have a fixed color/size mapping.
++ `Save`: save the current image in SVG format
+
++ `Clear`: place a new, clean sheet on the plotter plate
+
++ `Log HPGL`: log HPGL commands to a file
+
++ `HPGL playback`: replay HPGL commands from a file
+
++ `Set pens`: configure color and size of pens.
+
+Default color/size of pens is as follows.
 
 | *No* | *Color*    | *Size* |
 |------|------------|--------|
@@ -43,3 +55,5 @@ Pens have a fixed color/size mapping.
 ## Change history
 
 + 1.0: first release
+
++ 1.1: log/playback and pen setting commands added
