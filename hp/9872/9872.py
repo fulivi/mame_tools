@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A HP9872 emulator for use with MAME IEEE-488 remotizer
-# Copyright (C) 2022 F. Ulivi <fulivi at big "G" mail>
+# Copyright (C) 2022-2023 F. Ulivi <fulivi at big "G" mail>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,7 +17,8 @@
 # <http://www.gnu.org/licenses/>.
 
 import sys
-from PyQt5 import QtCore, QtGui, QtWidgets , QtSvg
+sys.path.append("../hp_disk/")
+from PyQt6 import QtCore, QtGui, QtWidgets , QtSvg
 import plot9872
 import rem488
 import resources
@@ -71,27 +72,27 @@ class Platen(QtWidgets.QWidget):
         self.segments = []
         self.xform = None
         self.menu = QtWidgets.QMenu(self)
-        a1 = QtWidgets.QAction("Save.." , self.menu)
+        a1 = QtGui.QAction("Save.." , self.menu)
         self.menu.addAction(a1)
         a1.triggered.connect(self.menu_save)
-        a2 = QtWidgets.QAction("Clear" , self.menu)
+        a2 = QtGui.QAction("Clear" , self.menu)
         self.menu.addAction(a2)
         a2.triggered.connect(self.menu_clear)
-        self.log_action = QtWidgets.QAction("Log HPGL.." , self.menu)
+        self.log_action = QtGui.QAction("Log HPGL.." , self.menu)
         self.menu.addAction(self.log_action)
         self.log_action.triggered.connect(self.menu_log)
         self.log_action.setCheckable(True)
         self.log_file = None
-        self.pbk_action = QtWidgets.QAction("HPGL playback.." , self.menu)
+        self.pbk_action = QtGui.QAction("HPGL playback.." , self.menu)
         self.menu.addAction(self.pbk_action)
         self.pbk_action.triggered.connect(self.menu_pbk)
-        self.pen_action = QtWidgets.QAction("Set pens.." , self.menu)
+        self.pen_action = QtGui.QAction("Set pens.." , self.menu)
         self.menu.addAction(self.pen_action)
         self.pen_action.triggered.connect(self.menu_pen)
         self.pens = self.DEFAULT_PENS
 
     def mousePressEvent(self , event):
-        if event.button() == QtCore.Qt.RightButton:
+        if event.button() == QtCore.Qt.MouseButton.RightButton:
             self.menu.popup(self.mapToGlobal(event.pos()))
 
     def menu_save(self , action):
@@ -125,7 +126,7 @@ class Platen(QtWidgets.QWidget):
             f = filename[ 0 ]
             if f:
                 self.log_file = QtCore.QFile(f)
-                if not self.log_file.open(QtCore.QIODevice.WriteOnly):
+                if not self.log_file.open(QtCore.QIODevice.OpenModeFlag.WriteOnly):
                     QtWidgets.QMessageBox.critical(self , "Error" , "Can't open log file")
                     self.log_file = None
                 else:
@@ -142,7 +143,7 @@ class Platen(QtWidgets.QWidget):
         f = filename[ 0 ]
         if f:
             pbk_file = QtCore.QFile(f)
-            if not pbk_file.open(QtCore.QIODevice.ReadOnly):
+            if not pbk_file.open(QtCore.QIODevice.OpenModeFlag.ReadOnly):
                 QtWidgets.QMessageBox.critical(self , "Error" , "Can't open file")
             else:
                 pbk_data = pbk_file.readAll().data()
@@ -151,7 +152,7 @@ class Platen(QtWidgets.QWidget):
     def menu_pen(self , action):
         dlg = Pen_dialog(self.main_win , self.pens , self.DEFAULT_PENS)
         rt = dlg.exec()
-        if rt == QtWidgets.QDialog.Accepted:
+        if rt == QtWidgets.QDialog.DialogCode.Accepted:
             self.pens = dlg.get_pen_settings()
 
     # SLOT
@@ -197,7 +198,7 @@ class Platen(QtWidgets.QWidget):
 
     def paintEvent(self , event):
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         if self.xform:
             painter.setTransform(self.xform)
         pen = QtGui.QPen(QtCore.Qt.GlobalColor.gray)
@@ -444,7 +445,7 @@ class Rem488_io(QtCore.QThread):
 
     # Draw a segment
     def draw_segment(self , segment):
-        print("Seg:{} Pen={}".format(str(segment) , segment.pen_no))
+        #print("Seg:{} Pen={}".format(str(segment) , segment.pen_no))
         self.add_segment.emit(segment)
 
     # Set ERROR LED state
@@ -615,7 +616,7 @@ def get_options(app):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("HP9872 emulator")
-    app.setApplicationVersion("1.1")
+    app.setApplicationVersion("2.0")
     port , address = get_options(app)
     #my_io = My_io()
     my_io = Rem488_io(port , address)
@@ -630,4 +631,4 @@ if __name__ == '__main__':
     my_io.start()
     myapp.load_settings()
     myapp.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

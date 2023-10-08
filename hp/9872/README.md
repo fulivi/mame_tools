@@ -17,7 +17,7 @@
 
 These files must be placed in the same directory. The emulator also needs `rem488.py` from HP disk emulator. You can either copy it over to 9872 directory or set the `PYTHONPATH` environment variable to point to HP disk directory.
 
-9872 is written in Python 3. It requires the [PyQt5 library](https://www.riverbankcomputing.com/software/pyqt/download5) which can be installed with `pip install PyQt5`.
+9872 is written in Python 3. It requires the [PyQt6 library](https://www.riverbankcomputing.com/software/pyqt/download5) which can be installed with `pip install PyQt6`.
 
 ## Usage
 
@@ -57,3 +57,5 @@ Default color/size of pens is as follows.
 + 1.0: first release
 
 + 1.1: log/playback and pen setting commands added
+
++ 2.0: Ported to Qt6. Most of 9872.py rewrote for more accurate emulation after 9872 firmware reverse-engineering.

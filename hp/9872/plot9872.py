@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A HP9872 emulator for use with MAME IEEE-488 remotizer
-# Copyright (C) 2022 F. Ulivi <fulivi at big "G" mail>
+# Copyright (C) 2022-2023 F. Ulivi <fulivi at big "G" mail>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,15 +16,15 @@
 # along with this program.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-# Parts of this file come from hp2xx HPGL converter (https://www.gnu.org/software/hp2xx/),
-# especially the font definition.
+# This version of emulator is based on the reverse-engineering of 9872 firmware.
+# See https://github.com/fulivi/hp9872_re
 
 import rem488
-import sys
 import itertools
 import re
 import io
 import math
+from copy import deepcopy
 
 # LB terminator
 ETX="\x03"
@@ -40,6 +40,10 @@ DEF_X_P1 = 520
 DEF_Y_P1 = 380
 DEF_X_P2 = 15720
 DEF_Y_P2 = 10380
+
+# Reset position
+RST_X = 16000
+RST_Y = 0
 
 # "Impossible" pen position
 NO_X_PEN = 65535
@@ -115,73 +119,89 @@ class Parser:
     def __init__(self):
         self.int_arg_re = re.compile(r"[+-]?\d+$")
         self.fix_arg_re = re.compile(r"[+-]?\d*\.\d+$")
-        self.rest = ""
+        # 0 Start
+        # 1 1st letter of cmd parsed
+        # 2 2nd letter of cmd parsed, accumulating parameters (if any)
+        # 3 Accumulating string for LB cmd
+        # 4 Waiting for [\n;] in SM cmd
+        # 5 Waiting for \n in SM cmd
+        self.state = 0
 
     def parse(self , s):
-        tot = self.rest + s
-        while len(tot) >= 3:
-            tot_strip = tot.lstrip()
-            if len(tot_strip) < 3:
-                break
-            else:
-                cmd = tot_strip[ :2 ].upper()
-                arg = tot_strip[ 2: ]
-                # LB command is terminated by ^C
-                if cmd == "LB":
-                    # Search for terminating ETX
-                    idx = arg.find(ETX)
-                    if idx >= 0:
-                        yield ParsedCmd("LB" , [ ParsedString(arg[ :idx ]) ])
-                        tot = arg[ idx+1: ]
-                    else:
-                        break
+        for c in s:
+            if self.state < 3 and (c == ' ' or c == '\r'):
+                continue
+            elif self.state == 0:
+                if c == '\n' or c == ';':
+                    # NOP
+                    continue
                 else:
-                    # Find terminating ; or \n
-                    idx = arg.find(";")
-                    if idx >= 0:
-                        idx2 = arg.find("\n")
-                        if idx2 >= 0:
-                            idx = min(idx , idx2)
+                    self.cmd = c.upper()
+                    self.state = 1
+            elif self.state == 1:
+                if c == '\n' or c == ';':
+                    yield ParsedCmd(self.cmd, [])
+                    self.state = 0
+                else:
+                    self.cmd += c.upper()
+                    self.param = ""
+                    if self.cmd == "LB":
+                        self.state = 3
                     else:
-                        idx = arg.find("\n")
-                    if idx < 0:
-                        break
-                    if cmd == "SM":
-                        # SM is terminated by ; or \n like other commands but it has
-                        # 0 or 1 character as parameter
-                        if idx < 2:
-                            yield ParsedCmd(cmd , [ ParsedString(arg[ :idx ]) ])
-                        else:
-                            yield ParsedCmd(cmd , [ BadArg(arg[ :idx ]) ])
-                    elif cmd.isalpha():
-                        # Split arguments
-                        pieces = arg[ :idx ].split(",")
-                        pieces = [ p.strip() for p in pieces ]
-                        args = []
-                        if len(pieces) > 1 or pieces[ 0 ]:
-                            for p in pieces:
-                                p_strip = p.strip()
-                                if p_strip:
-                                    mo = self.fix_arg_re.match(p_strip)
-                                    if mo:
-                                        x = float(mo.group())
-                                        x = int(x / DEC_ROUND) * DEC_ROUND
-                                        args.append(ParsedFixArg(x))
-                                    else:
-                                        mo = self.int_arg_re.match(p_strip)
-                                        if mo:
-                                            x = int(mo.group())
-                                            args.append(ParsedIntArg(x))
-                                        else:
-                                            args.append(ParseError(p_strip))
+                        self.state = 2
+            elif self.state == 2:
+                if c == '\n' or c == ';':
+                    # Split arguments
+                    pieces = self.param.split(",")
+                    pieces = [ p.strip() for p in pieces ]
+                    args = []
+                    if len(pieces) > 1 or pieces[ 0 ]:
+                        for p in pieces:
+                            p_strip = p.strip()
+                            if p_strip:
+                                mo = self.fix_arg_re.match(p_strip)
+                                if mo:
+                                    x = float(mo.group())
+                                    x = int(x / DEC_ROUND) * DEC_ROUND
+                                    args.append(ParsedFixArg(x))
                                 else:
-                                    # Empty argument
-                                    args.append(BadArg(""))
-                        yield ParsedCmd(cmd , args)
-                    else:
-                        yield ParseError(cmd)
-                    tot = arg[ idx+1: ]
-        self.rest = tot
+                                    mo = self.int_arg_re.match(p_strip)
+                                    if mo:
+                                        x = int(mo.group())
+                                        args.append(ParsedIntArg(x))
+                                    else:
+                                        args.append(ParseError(p_strip))
+                            else:
+                                # Empty argument
+                                args.append(BadArg(""))
+                    yield ParsedCmd(self.cmd , args)
+                    self.state = 0
+                elif self.cmd == "SM":
+                    self.param = c
+                    self.state = 4
+                else:
+                    self.param += c
+            elif self.state == 3:
+                if c == ETX:
+                    yield ParsedCmd("LB" , [ ParsedString(self.param) ])
+                    self.state = 0
+                else:
+                    self.param += c
+            elif self.state == 4:
+                if c == '\n' or c == ';':
+                    yield ParsedCmd(self.cmd , [ ParsedString(self.param) ])
+                    self.state = 0
+                elif c == '\r':
+                    self.state = 5
+                else:
+                    yield ParsedCmd(self.cmd , [ InvalidArg() ])
+                    self.state = 0
+            else:
+                if c == '\n':
+                    yield ParsedCmd(self.cmd , [ ParsedString(self.param) ])
+                else:
+                    yield ParsedCmd(self.cmd , [ InvalidArg() ])
+                self.state = 0
 
 class WrongNumArgs(Exception):
     pass
@@ -192,6 +212,9 @@ class InvalidArg(Exception):
 class InvalidChar(Exception):
     pass
 
+class UnknownCharSet(Exception):
+    pass
+
 class PosOverflow(Exception):
     pass
 
@@ -200,11 +223,14 @@ class Point:
         self.x = x
         self.y = y
 
-    def dup(self):
-        return Point(self.x , self.y)
-
     def __eq__(self , other):
         return self.x == other.x and self.y == other.y
+
+    def __add__(self , other):
+        return Point(self.x + other.x, self.y + other.y)
+
+    def __sub__(self , other):
+        return Point(self.x - other.x, self.y - other.y)
 
     # Distance between self and other
     def dist(self , other):
@@ -215,8 +241,8 @@ class Point:
 
 class Segment:
     def __init__(self , p1 , p2):
-        self.p1 = p1
-        self.p2 = p2
+        self.p1 = deepcopy(p1)
+        self.p2 = deepcopy(p2)
 
     def null_len(self):
         return self.p1 == self.p2
@@ -235,6 +261,9 @@ class Rectangle:
         self.pur = pur
 
     def contains(self , pt):
+        return self.pll.x <= pt.x <= self.pur.x and self.pll.y <= pt.y <= self.pur.y
+
+    def __contains__(self , pt):
         return self.pll.x <= pt.x <= self.pur.x and self.pll.y <= pt.y <= self.pur.y
 
     def __str__(self):
@@ -295,262 +324,331 @@ def group_pairs(iterable):
     return itertools.zip_longest(*args)
 
 class Font:
-    CHARSET0 = [
+    # Each codepoint is a 3-element tuple
+    # [0]       Offset to center character for SM cmd
+    # [1]       True if character has auto-backspace
+    # [2]       List of pen movements. Each element is a 3-element tuple:
+    #   [0]     Pen up (False) or pen down (True)
+    #   [1]     X coord delta (1 character width = 48)
+    #   [2]     Y coord delta (1 character height = 32)
+    FONT = [
+        # 00
+        ((-1, -16), False, [(False, 0, 0), (True, 2, 0), (True, 0, 2), (True, -2, 0), (True, 0, -2), (False, 1, 11), (True, 0, 21)]),
+        # 01
+        ((-16, -31), False, [(False, 10, 26), (True, 0, 10), (False, 12, 0), (True, 0, -10)]),
+        # 02
+        ((-16, -16), False, [(False, 4, 0), (True, 12, 32), (False, 12, 0), (True, -12, -32), (False, 16, 12), (True, -32, 0), (False, 0, 8), (True, 32, 0)]),
+        # 03
+        ((-16, -16), False, [(False, 0, 6), (True, 2, -3), (True, 5, -2), (True, 18, 0), (True, 5, 2), (True, 2, 3), (True, 0, 5), (True, -2, 3), (True, -5, 2), (True, -18, 1), (True, -5, 2), (True, -2, 3), (True, 0, 4), (True, 2, 3), (True, 5, 2), (True, 17, 0), (True, 5, -2), (True, 2, -3), (False, -15, 10), (True, 0, -40)]),
+        # 04
+        ((-16, -16), False, [(False, 0, 0), (True, 32, 32), (False, -22, 0), (True, -6, 0), (True, -3, -1), (True, -1, -2), (True, 0, -5), (True, 1, -2), (True, 3, -1), (True, 6, 0), (True, 3, 1), (True, 1, 2), (True, 0, 5), (True, -1, 2), (True, -3, 1), (False, 12, -21), (True, -3, -1), (True, -1, -2), (True, 0, -5), (True, 1, -2), (True, 3, -1), (True, 6, 0), (True, 3, 1), (True, 1, 2), (True, 0, 5), (True, -1, 2), (True, -3, 1), (True, -6, 0)]),
+        # 05
+        ((-16, -16), False, [(False, 8, 19), (True, -6, -3), (True, -2, -4), (True, 0, -5), (True, 2, -4), (True, 4, -2), (True, 5, -1), (True, 10, 0), (True, 5, 1), (True, 4, 2), (True, 2, 4), (True, 0, 6), (False, -3, 12), (True, 0, 3), (True, -2, 3), (True, -5, 1), (True, -11, 0), (True, -5, -1), (True, -2, -3), (True, 0, -4), (True, 2, -3), (True, 26, -21)]),
+        # 06
+        ((-16, -30), False, [(False, 15, 27), (True, 2, 1), (True, 1, 1), (True, 0, 5), (True, -3, 0), (True, 0, -2), (True, 3, 0)]),
+        # 07
+        ((-28, -16), False, [(False, 32, -4), (True, -4, 4), (True, -3, 5), (True, -1, 5), (True, 0, 12), (True, 1, 5), (True, 3, 5), (True, 4, 4)]),
+        # 08
+        ((-4, -16), False, [(False, 0, -4), (True, 4, 4), (True, 3, 5), (True, 1, 5), (True, 0, 12), (True, -1, 5), (True, -3, 5), (True, -4, 4)]),
+        # 09
+        ((-16, -16), False, [(False, 4, 4), (True, 24, 24), (False, 4, -12), (True, -32, 0), (False, 4, 12), (True, 24, -24)]),
+        # 0a
+        ((-16, -16), False, [(False, 16, 4), (True, 0, 24), (False, -16, -12), (True, 32, 0)]),
+        # 0b
+        ((-1, 1), False, [(False, 3, 0), (True, -3, 0), (True, 0, 2), (True, 3, 0), (True, 0, -5), (True, -1, -1), (True, -2, -1)]),
+        # 0c
+        ((-16, -16), False, [(False, 0, 16), (True, 32, 0)]),
+        # 0d
+        ((-16, -1), False, [(False, 15, 0), (True, 0, 2), (True, 3, 0), (True, 0, -2), (True, -3, 0)]),
+        # 0e
+        ((-16, -16), False, [(False, 0, -4), (True, 32, 40)]),
+        # 0f
+        ((-16, -16), False, [(False, 14, 0), (True, -7, 2), (True, -3, 3), (True, -3, 6), (True, 0, 10), (True, 3, 6), (True, 3, 3), (True, 6, 2), (True, 6, 0), (True, 6, -2), (True, 3, -3), (True, 3, -6), (True, 0, -10), (True, -3, -6), (True, -3, -3), (True, -6, -2), (True, -5, 0)]),
+        # 10
+        ((-18, -16), False, [(False, 8, 20), (True, 12, 12), (True, 0, -32), (False, -12, 0), (True, 20, 0)]),
+        # 11
+        ((-16, -16), False, [(False, 1, 26), (True, 2, 4), (True, 6, 2), (True, 15, 0), (True, 6, -2), (True, 2, -4), (True, 0, -5), (True, -2, -4), (True, -6, -2), (True, -16, -2), (True, -5, -3), (True, -3, -10), (True, 32, 0)]),
+        # 12
+        ((-16, -16), False, [(False, 1, 27), (True, 2, 3), (True, 5, 2), (True, 16, 0), (True, 5, -2), (True, 2, -4), (True, 0, -3), (True, -2, -4), (True, -4, -2), (True, -15, 0), (False, 15, 0), (True, 5, -2), (True, 2, -4), (True, 0, -5), (True, -2, -4), (True, -5, -2), (True, -18, 0), (True, -5, 2), (True, -2, 4)]),
+        # 13
+        ((-16, -16), False, [(False, 32, 8), (True, -32, 0), (True, 28, 24), (True, 0, -32)]),
+        # 14
+        ((-16, -16), False, [(False, 0, 5), (True, 2, -3), (True, 6, -2), (True, 16, 0), (True, 6, 2), (True, 2, 4), (True, 0, 9), (True, -2, 4), (True, -6, 2), (True, -15, 0), (True, -6, -2), (True, -3, -3), (True, 0, 16), (True, 32, 0)]),
+        # 15
+        ((-16, -16), False, [(False, 0, 12), (True, 2, 4), (True, 5, 2), (True, 18, 0), (True, 5, -2), (True, 2, -4), (True, 0, -6), (True, -2, -4), (True, -5, -2), (True, -18, 0), (True, -5, 2), (True, -2, 4), (True, 0, 20), (True, 2, 4), (True, 5, 2), (True, 18, 0), (True, 5, -2), (True, 2, -4)]),
+        # 16
+        ((-16, -16), False, [(False, 0, 32), (True, 32, 0), (True, -24, -32)]),
+        # 17
+        ((-16, -16), False, [(False, 7, 17), (True, -4, 2), (True, -2, 4), (True, 0, 4), (True, 2, 3), (True, 5, 2), (True, 16, 0), (True, 5, -2), (True, 2, -4), (True, 0, -3), (True, -2, -4), (True, -4, -2), (True, -18, 0), (True, -5, -2), (True, -2, -4), (True, 0, -5), (True, 2, -4), (True, 5, -2), (True, 18, 0), (True, 5, 2), (True, 2, 4), (True, 0, 5), (True, -2, 4), (True, -5, 2)]),
+        # 18
+        ((-16, -16), False, [(False, 0, 6), (True, 2, -4), (True, 5, -2), (True, 18, 0), (True, 5, 2), (True, 2, 4), (True, 0, 20), (True, -2, 4), (True, -5, 2), (True, -18, 0), (True, -5, -2), (True, -2, -4), (True, 0, -6), (True, 2, -4), (True, 5, -2), (True, 18, 0), (True, 5, 2), (True, 2, 4)]),
+        # 19
+        ((-1, -12), False, [(False, 0, 0), (True, 0, 2), (True, 3, 0), (True, 0, -2), (True, -3, 0), (False, 0, 22), (True, 0, 2), (True, 3, 0), (True, 0, -2), (True, -3, 0)]),
+        # 1a
+        ((-1, -9), False, [(False, 3, 0), (True, -3, 0), (True, 0, 2), (True, 3, 0), (True, 0, -5), (True, -1, -1), (True, -2, -1), (False, 0, 27), (True, 0, 2), (True, 3, 0), (True, 0, -2), (True, -3, 0)]),
+        # 1b
+        ((-16, -16), False, [(False, 32, 4), (True, -32, 12), (True, 32, 12)]),
+        # 1c
+        ((-16, -16), False, [(False, 0, 12), (True, 32, 0), (False, -32, 8), (True, 32, 0)]),
+        # 1d
+        ((-16, -16), False, [(False, 0, 4), (True, 32, 12), (True, -32, 12)]),
+        # 1e
+        ((-16, -16), False, [(False, 0, 27), (True, 2, 3), (True, 5, 2), (True, 18, 0), (True, 5, -2), (True, 2, -3), (True, 0, -6), (True, -2, -3), (True, -5, -2), (True, -8, -1), (True, -2, -2), (True, -1, -3), (False, -1, -8), (True, 3, 0), (True, 0, -2), (True, -3, 0), (True, 0, 2)]),
+        # 1f
+        ((-16, -16), False, [(False, 28, 0), (True, -18, 0), (True, -6, 1), (True, -3, 3), (True, -1, 4), (True, 0, 16), (True, 1, 4), (True, 3, 3), (True, 6, 1), (True, 12, 0), (True, 6, -1), (True, 3, -3), (True, 1, -4), (True, 0, -11), (True, -3, -3), (True, -4, -1), (True, -9, 0), (True, -4, 1), (True, -3, 3), (True, 0, 6), (True, 3, 3), (True, 4, 1), (True, 9, 0), (True, 4, -1), (True, 3, -3)]),
         # 20
-        [ ],
+        ((-16, -16), False, [(False, 0, 0), (True, 16, 32), (True, 16, -32), (False, -28, 8), (True, 24, 0)]),
         # 21
-        [ (False,2,0),(True,2,1),(False,2,2),(True,2,6) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (True, 24, 0), (True, 5, -2), (True, 2, -3), (True, 0, -5), (True, -2, -3), (True, -5, -2), (True, 6, -2), (True, 2, -4), (True, 0, -5), (True, -2, -4), (True, -6, -2), (True, -24, 0), (False, 0, 17), (True, 24, 0)]),
         # 22
-        [ (False,1,5),(True,1,6),(False,3,5),(True,3,6) ],
+        ((-16, -16), False, [(False, 31, 7), (True, -1, -3), (True, -3, -3), (True, -7, -1), (True, -8, 0), (True, -7, 1), (True, -3, 3), (True, -2, 6), (True, 0, 12), (True, 2, 6), (True, 3, 3), (True, 7, 1), (True, 8, 0), (True, 7, -1), (True, 3, -3), (True, 1, -3)]),
         # 23
-        [ (False,1,0),(True,1,6),(False,3,0),(True,3,6),(False,0,2),(True,4,2),(False,0,4),(True,4,4) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (True, 20, 0), (True, 7, -1), (True, 3, -3), (True, 2, -6), (True, 0, -12), (True, -2, -6), (True, -3, -3), (True, -7, -1), (True, -20, 0)]),
         # 24
-        [ (False,2,0),(True,2,6),(False,4,5),(True,1,5),(True,0,4),(True,1,3),(True,3,3),(True,4,2),(True,3,1),(True,0,1) ],
+        ((-16, -16), False, [(False, 32, 0), (True, -32, 0), (True, 0, 32), (True, 32, 0), (False, -32, -15), (True, 26, 0)]),
         # 25
-        [ (False,0,0),(True,4,6),(False,1,5),(True,1,4),(True,2,4),(True,2,5),(True,1,5),(False,2,2),(True,2,1),(True,3,1),(True,3,2),(True,2,2) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (True, 32, 0), (False, -32, -15), (True, 24, 0)]),
         # 26
-        [ (False,4,0),(True,0,4),(True,0,5),(True,1,6),(True,2,5),(True,2,4),(True,0,2),(True,0,1),(True,1,0),(True,2,0),(True,4,2) ],
+        ((-16, -16), False, [(False, 30, 28), (True, -3, 3), (True, -7, 1), (True, -8, 0), (True, -7, -1), (True, -3, -3), (True, -2, -6), (True, 0, -12), (True, 2, -6), (True, 3, -3), (True, 7, -1), (True, 8, 0), (True, 7, 1), (True, 3, 3), (True, 2, 6), (True, 0, 5), (True, -16, 0)]),
         # 27
-        [ (False,2,5),(True,3,6) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (False, 0, -15), (True, 32, 0), (False, 0, 15), (True, 0, -32)]),
         # 28
-        [ (False,4,6),(True,2,4),(True,2,2),(True,4,0) ],
+        ((-16, -16), False, [(False, 4, 32), (True, 24, 0), (False, -12, 0), (True, 0, -32), (False, -12, 0), (True, 24, 0)]),
         # 29
-        [ (False,0,0),(True,2,2),(True,2,4),(True,0,6) ],
+        ((-16, -16), False, [(False, 12, 32), (True, 20, 0), (False, -8, 0), (True, 0, -22), (True, -1, -6), (True, -3, -3), (True, -5, -1), (True, -6, 0), (True, -5, 1), (True, -3, 3), (True, -1, 6)]),
         # 2a
-        [ (False,-1,1),(True,5,5),(False,5,1),(True,-1,5),(False,2,6),(True,2,0) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (False, 0, -15), (True, 10, 0), (False, 20, 15), (True, -20, -15), (True, 22, -17)]),
         # 2b
-        [ (False,2,1),(True,2,5),(False,0,3),(True,4,3) ],
+        ((-16, -16), False, [(False, 0, 32), (True, 0, -32), (True, 32, 0)]),
         # 2c
-        [ (False,2,0),(True,1,0),(True,1,1),(True,2,1),(True,2,-1),(True,1,-2) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (True, 16, -24), (True, 16, 24), (True, 0, -32)]),
         # 2d
-        [ (False,0,3),(True,4,3) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (True, 32, -32), (True, 0, 32)]),
         # 2e
-        [ (False,2,0),(True,1,0),(True,1,1),(True,2,1),(True,2,0) ],
+        ((-16, -16), False, [(False, 12, 0), (True, -7, 1), (True, -3, 3), (True, -2, 6), (True, 0, 12), (True, 2, 6), (True, 3, 3), (True, 7, 1), (True, 8, 0), (True, 7, -1), (True, 3, -3), (True, 2, -6), (True, 0, -12), (True, -2, -6), (True, -3, -3), (True, -7, -1), (True, -8, 0)]),
         # 2f
-        [ (True,5,6) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (True, 25, 0), (True, 5, -2), (True, 2, -3), (True, 0, -8), (True, -2, -3), (True, -5, -2), (True, -25, 0)]),
         # 30
-        [ (False,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,5),(True,3,6),(True,1,6),(True,0,5),(True,0,1) ],
+        ((-16, -16), False, [(False, 12, 0), (True, -7, 1), (True, -3, 3), (True, -2, 6), (True, 0, 12), (True, 2, 6), (True, 3, 3), (True, 7, 1), (True, 8, 0), (True, 7, -1), (True, 3, -3), (True, 2, -6), (True, 0, -12), (True, -2, -6), (True, -3, -3), (True, -7, -1), (True, -8, 0), (False, 8, 13), (True, 12, -13)]),
         # 31
-        [ (False,1,0),(True,3,0),(False,2,0),(True,2,6),(True,1,5) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (True, 25, 0), (True, 5, -2), (True, 2, -3), (True, 0, -8), (True, -2, -3), (True, -5, -2), (True, -25, 0), (False, 25, 0), (True, 5, -2), (True, 2, -3), (True, 0, -9)]),
         # 32
-        [ (False,0,5),(True,1,6),(True,3,6),(True,4,5),(True,4,4),(True,0,1),(True,0,0),(True,4,0) ],
+        ((-16, -16), False, [(False, 0, 5), (True, 2, -3), (True, 5, -2), (True, 18, 0), (True, 5, 2), (True, 2, 3), (True, 0, 6), (True, -2, 3), (True, -5, 2), (True, -18, 1), (True, -5, 2), (True, -2, 3), (True, 0, 5), (True, 2, 3), (True, 5, 2), (True, 17, 0), (True, 5, -2), (True, 2, -3)]),
         # 33
-        [ (False,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,2),(True,3,3),(True,2,3),(True,4,6),(True,0,6) ],
+        ((-16, -16), False, [(False, 0, 32), (True, 32, 0), (False, -16, 0), (True, 0, -32)]),
         # 34
-        [ (False,3,6),(True,0,3),(True,0,2),(True,4,2),(False,3,3),(True,3,0) ],
+        ((-16, -16), False, [(False, 0, 32), (True, 0, -23), (True, 2, -5), (True, 3, -3), (True, 7, -1), (True, 8, 0), (True, 7, 1), (True, 3, 3), (True, 2, 5), (True, 0, 23)]),
         # 35
-        [ (False,4,6),(True,0,6),(True,0,4),(True,3,4),(True,4,3),(True,4,1),(True,3,0),(True,1,0),(True,0,1) ],
+        ((-16, -16), False, [(False, 0, 32), (True, 16, -32), (True, 16, 32)]),
         # 36
-        [ (False,4,6),(True,2,6),(True,0,4),(True,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,2),(True,3,3),(True,0,3) ],
+        ((-16, -16), False, [(False, 0, 32), (True, 4, -32), (True, 12, 24), (True, 12, -24), (True, 4, 32)]),
         # 37
-        [ (False,0,6),(True,4,6),(True,4,5),(True,0,2),(True,0,0) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 31, 32), (False, -30, 0), (True, 31, -32)]),
         # 38
-        [ (False,3,3),(True,4,4),(True,4,5),(True,3,6),(True,1,6),(True,0,5),(True,0,4),(True,1,3),(True,3,3),(True,4,2),(True,4,1),(True,3,0),(True,1,0),(True,0,1),(True,0,2),(True,1,3) ],
+        ((-15, -16), False, [(False, 15, 0), (True, 0, 14), (False, -16, 18), (True, 16, -18), (True, 16, 18)]),
         # 39
-        [ (False,1,0),(True,2,0),(True,4,2),(True,4,5),(True,3,6),(True,1,6),(True,0,5),(True,0,4),(True,1,3),(True,4,3) ],
+        ((-16, -16), False, [(False, 1, 32), (True, 30, 0), (True, -31, -32), (True, 32, 0)]),
         # 3a
-        [ (False,1,3),(True,1,4),(True,2,4),(True,2,3),(True,1,3),(False,1,1),(True,2,1),(True,2,0),(True,1,0),(True,1,1) ],
+        ((-27, -16), False, [(False, 32, -4), (True, -10, 0), (True, 0, 40), (True, 10, 0)]),
         # 3b
-        [ (False,1,2),(True,1,3),(True,2,3),(True,2,2),(True,1,2),(False,2,0),(True,1,0),(True,1,1),(True,2,1),(True,2,-1),(True,1,-2) ],
+        ((-16, -16), False, [(False, 0, 36), (True, 32, -40)]),
         # 3c
-        [ (False,3,6),(True,0,3),(True,3,0) ],
+        ((-5, -16), False, [(False, 0, -4), (True, 10, 0), (True, 0, 40), (True, -10, 0)]),
         # 3d
-        [ (False,0,4),(True,4,4),(False,0,2),(True,4,2) ],
+        ((-14, -33), False, [(False, 4, 30), (True, 10, 6), (True, 10, -6)]),
         # 3e
-        [ (False,0,6),(True,3,3),(True,0,0) ],
+        ((-24, 6), False, [(False, 0, -6), (True, 48, 0)]),
         # 3f
-        [ (False,0,5),(True,1,6),(True,3,6),(True,4,5),(True,4,4),(True,3,3),(True,2,3),(True,2,2),(False,2,1),(True,2,0) ],
+        ((-14, -34), False, [(False, 8, 38), (True, 12, -8)]),
         # 40
-        [ (False,3,-1),(True,1,-1),(True,0,0),(True,0,4),(True,1,6),(True,3,6),(True,4,5),(True,4,2),(True,3,1),(True,2,2),(True,2,3),(True,3,4),(True,4,4) ],
+        ((-14, -12), False, [(False, 2, 22), (True, 2, 1), (True, 6, 1), (True, 8, 0), (True, 6, -1), (True, 3, -3), (True, 1, -4), (True, 0, -16), (False, 0, 10), (True, -3, 3), (True, -4, 1), (True, -14, 0), (True, -4, -1), (True, -3, -3), (True, 0, -6), (True, 3, -3), (True, 4, -1), (True, 14, 0), (True, 4, 1), (True, 3, 3)]),
         # 41
-        [ (False,0,0),(True,0,5),(True,1,6),(True,3,6),(True,4,5),(True,4,0),(False,0,2),(True,4,2) ],
+        ((-14, -16), False, [(False, 0, 0), (True, 0, 32), (False, 0, -14), (True, 3, 4), (True, 6, 2), (True, 10, 0), (True, 6, -2), (True, 3, -5), (True, 0, -10), (True, -3, -5), (True, -6, -2), (True, -10, 0), (True, -6, 2), (True, -3, 4)]),
         # 42
-        [ (False,0,0),(True,0,6),(True,3,6),(True,4,5),(True,4,4),(True,3,3),(True,0,3),(False,0,0),(True,3,0),(True,4,1),(True,4,2),(True,3,3) ],
+        ((-14, -12), False, [(False, 28, 18), (True, -3, 4), (True, -6, 2), (True, -10, 0), (True, -6, -2), (True, -3, -5), (True, 0, -10), (True, 3, -5), (True, 6, -2), (True, 10, 0), (True, 6, 2), (True, 3, 4)]),
         # 43
-        [ (False,4,1),(True,3,0),(True,1,0),(True,0,1),(True,0,5),(True,1,6),(True,3,6),(True,4,5) ],
+        ((-16, -16), False, [(False, 28, 6), (True, -3, -4), (True, -6, -2), (True, -10, 0), (True, -6, 2), (True, -3, 5), (True, 0, 10), (True, 3, 5), (True, 6, 2), (True, 10, 0), (True, 6, -2), (True, 3, -4), (False, 0, 14), (True, 0, -32)]),
         # 44
-        [ (False,0,0),(True,0,6),(True,3,6),(True,4,5),(True,4,1),(True,3,0),(True,0,0) ],
+        ((-14, -12), False, [(False, 0, 13), (True, 28, 0), (True, 0, 4), (True, -3, 5), (True, -6, 2), (True, -10, 0), (True, -6, -2), (True, -3, -5), (True, 0, -10), (True, 3, -5), (True, 6, -2), (True, 12, 0), (True, 6, 3)]),
         # 45
-        [ (False,4,0),(True,0,0),(True,0,6),(True,4,6),(False,0,3),(True,3,3) ],
+        ((-12, -16), False, [(False, 12, 0), (True, 0, 28), (True, 2, 3), (True, 5, 1), (True, 5, 0), (False, -19, -12), (True, 19, 0)]),
         # 46
-        [ (False,0,0),(True,0,6),(True,4,6),(False,0,3),(True,3,3) ],
+        ((-14, -8), False, [(False, 1, -6), (True, 6, -2), (True, 12, 0), (True, 6, 2), (True, 3, 4), (True, 0, 26), (False, 0, -6), (True, -3, 4), (True, -6, 2), (True, -10, 0), (True, -6, -2), (True, -3, -5), (True, 0, -8), (True, 3, -5), (True, 6, -2), (True, 10, 0), (True, 6, 2), (True, 3, 5)]),
         # 47
-        [ (False,4,5),(True,3,6),(True,1,6),(True,0,5),(True,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,3),(True,1,3) ],
+        ((-14, -16), False, [(False, 0, 0), (True, 0, 32), (False, 0, -14), (True, 3, 4), (True, 6, 2), (True, 10, 0), (True, 6, -2), (True, 3, -4), (True, 0, -18)]),
         # 48
-        [ (False,0,0),(True,0,6),(False,4,0),(True,4,6),(False,0,3),(True,4,3) ],
+        ((-16, -16), False, [(False, 14, 32), (True, 0, -2), (False, -8, -8), (True, 12, 0), (True, 0, -22), (False, -12, 0), (True, 20, 0)]),
         # 49
-        [ (False,0,0),(True,4,0),(False,2,0),(True,2,6),(False,0,6),(True,4,6) ],
+        ((-9, -12), False, [(False, 6, -8), (True, 5, 0), (True, 5, 1), (True, 2, 3), (True, 0, 26), (True, -12, 0), (False, 8, 8), (True, 0, 2)]),
         # 4a
-        [ (False,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,6),(True,0,6) ],
+        ((-14, -16), False, [(False, 0, 0), (True, 0, 32), (False, 26, -8), (True, -20, -11), (True, -6, 0), (False, 6, 0), (True, 22, -13)]),
         # 4b
-        [ (False,0,0),(True,0,6),(False,0,3),(True,1,3),(True,4,0),(False,1,3),(True,4,6) ],
+        ((-16, -16), False, [(False, 6, 32), (True, 12, 0), (True, 0, -32), (False, -12, 0), (True, 20, 0)]),
         # 4c
-        [ (False,0,6),(True,0,0),(True,4,0) ],
+        ((-16, -12), False, [(False, 0, 0), (True, 0, 24), (False, 0, -6), (True, 2, 4), (True, 4, 2), (True, 4, 0), (True, 4, -2), (True, 2, -4), (True, 0, -18), (False, 0, 18), (True, 2, 4), (True, 4, 2), (True, 4, 0), (True, 4, -2), (True, 2, -4), (True, 0, -18)]),
         # 4d
-        [ (False,0,0),(True,0,6),(True,2,4),(True,4,6),(True,4,0) ],
+        ((-14, -12), False, [(False, 0, 0), (True, 0, 24), (False, 0, -6), (True, 3, 4), (True, 6, 2), (True, 10, 0), (True, 6, -2), (True, 3, -4), (True, 0, -18)]),
         # 4e
-        [ (False,0,0),(True,0,6),(True,4,0),(True,4,6) ],
+        ((-14, -12), False, [(False, 9, 0), (True, -6, 2), (True, -3, 5), (True, 0, 10), (True, 3, 5), (True, 6, 2), (True, 10, 0), (True, 6, -2), (True, 3, -5), (True, 0, -10), (True, -3, -5), (True, -6, -2), (True, -10, 0)]),
         # 4f
-        [ (False,1,0),(True,0,1),(True,0,5),(True,1,6),(True,3,6),(True,4,5),(True,4,1),(True,3,0),(True,1,0) ],
+        ((-14, -8), False, [(False, 0, -8), (True, 0, 32), (False, 0, -6), (True, 3, 4), (True, 6, 2), (True, 10, 0), (True, 6, -2), (True, 3, -5), (True, 0, -10), (True, -3, -5), (True, -6, -2), (True, -10, 0), (True, -6, 2), (True, -3, 4)]),
         # 50
-        [ (False,0,0),(True,0,6),(True,3,6),(True,4,5),(True,4,4),(True,3,3),(True,0,3) ],
+        ((-14, -8), False, [(False, 28, 18), (True, -3, 4), (True, -6, 2), (True, -10, 0), (True, -6, -2), (True, -3, -5), (True, 0, -10), (True, 3, -5), (True, 6, -2), (True, 10, 0), (True, 6, 2), (True, 3, 4), (False, 0, 18), (True, 0, -32)]),
         # 51
-        [ (False,1,0),(True,0,1),(True,0,5),(True,1,6),(True,3,6),(True,4,5),(True,4,2),(True,2,0),(True,1,0),(False,2,2),(True,4,0) ],
+        ((-14, -12), False, [(False, 0, 0), (True, 0, 24), (False, 0, -8), (True, 4, 6), (True, 6, 2), (True, 9, 0), (True, 6, -2), (True, 3, -5)]),
         # 52
-        [ (False,0,0),(True,0,6),(True,3,6),(True,4,5),(True,4,4),(True,3,3),(True,0,3),(True,1,3),(True,4,0) ],
+        ((-14, -12), False, [(False, 0, 4), (True, 3, -3), (True, 6, -1), (True, 10, 0), (True, 6, 1), (True, 3, 3), (True, 0, 5), (True, -3, 3), (True, -6, 1), (True, -10, 0), (True, -6, 1), (True, -3, 2), (True, 0, 5), (True, 3, 2), (True, 6, 1), (True, 10, 0), (True, 6, -1), (True, 3, -2)]),
         # 53
-        [ (False,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,2),(True,3,3),(True,1,3),(True,0,4),(True,0,5),(True,1,6),(True,3,6),(True,4,5) ],
+        ((-14, -15), False, [(False, 0, 22), (True, 24, 0), (False, -16, 10), (True, 0, -28), (True, 3, -3), (True, 4, -1), (True, 9, 0), (True, 4, 2)]),
         # 54
-        [ (False,2,0),(True,2,6),(True,0,6),(True,4,6) ],
+        ((-14, -12), False, [(False, 0, 24), (True, 0, -18), (True, 3, -4), (True, 6, -2), (True, 10, 0), (True, 6, 2), (True, 3, 4), (False, 0, 18), (True, 0, -24)]),
         # 55
-        [ (False,0,6),(True,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,6) ],
+        ((-14, -12), False, [(False, 0, 24), (True, 14, -24), (True, 14, 24)]),
         # 56
-        [ (False,0,6),(True,0,4),(True,2,0),(True,4,4),(True,4,6) ],
+        ((-16, -12), False, [(False, 0, 24), (True, 5, -24), (True, 11, 18), (True, 11, -18), (True, 5, 24)]),
         # 57
-        [ (False,0,6),(True,0,0),(True,2,3),(True,4,0),(True,4,6) ],
+        ((-14, -12), False, [(False, 0, 0), (True, 27, 24), (False, -26, 0), (True, 27, -24)]),
         # 58
-        [ (False,0,0),(True,4,6),(False,4,0),(True,0,6) ],
+        ((-14, -8), False, [(False, 5, -8), (True, 4, 0), (True, 4, 3), (True, 3, 5), (True, 12, 24), (False, -28, 0), (True, 16, -24)]),
         # 59
-        [ (False,0,6),(True,0,5),(True,2,2),(True,2,0),(False,2,2),(True,4,5),(True,4,6) ],
+        ((-14, -12), False, [(False, 1, 24), (True, 26, 0), (True, -27, -24), (True, 28, 0)]),
         # 5a
-        [ (False,0,6),(True,4,6),(True,0,0),(True,4,0) ],
+        ((-26, -16), False, [(False, 32, 36), (True, -3, 0), (True, -2, -1), (True, -1, -2), (True, 0, -12), (True, -1, -2), (True, -2, -2), (True, -3, -1), (True, 3, -1), (True, 2, -2), (True, 1, -2), (True, 0, -12), (True, 1, -2), (True, 2, -1), (True, 3, 0)]),
         # 5b
-        [ (False,4,0),(True,2,0),(True,2,6),(True,4,6) ],
+        ((0, -16), False, [(False, 0, -4), (True, 0, 40)]),
         # 5c
-        [ (False,0,6),(True,4,0) ],
+        ((-6, -16), False, [(False, 0, 36), (True, 3, 0), (True, 2, -1), (True, 1, -2), (True, 0, -12), (True, 1, -2), (True, 2, -2), (True, 3, -1), (True, -3, -1), (True, -2, -2), (True, -1, -2), (True, 0, -12), (True, -1, -2), (True, -2, -1), (True, -3, 0)]),
         # 5d
-        [ (False,0,0),(True,2,0),(True,2,6),(True,0,6) ],
+        ((-14, -32), False, [(False, 0, 30), (True, 4, 4), (True, 3, 1), (True, 3, 0), (True, 2, -1), (True, 4, -3), (True, 2, -1), (True, 3, 0), (True, 3, 1), (True, 4, 4)]),
         # 5e
-        [ (False,0,4),(True,2,6),(True,4,4) ],
+        None,
         # 5f
-        [ (False,0,-1),(True,4,-1) ],
+        ((-16, -34), False, [(False, 16, 38), (True, 0, -8)]),
         # 60
-        [ (False,1,7),(True,3,4) ],
+        ((-16, -16), False, [(False, 0, 16), (True, 8, 0), (True, 8, -16), (True, 8, 32), (True, 8, 0)]),
         # 61
-        [ (False,4,0),(True,1,0),(True,0,1),(True,0,3),(True,1,4),(True,3,4),(True,3,0) ],
+        ((-16, -16), False, [(False, 16, 0), (True, 0, 32), (False, -16, -12), (True, 16, 12), (True, 16, -12)]),
         # 62
-        [ (False,0,0),(True,3,0),(True,4,1),(True,4,3),(True,3,4),(True,1,4),(False,1,6),(True,1,0) ],
+        ((24, 6), True, [(False, 0, -6), (True, -48, 0)]),
         # 63
-        [ (False,4,1),(True,3,0),(True,2,0),(True,1,1),(True,1,3),(True,2,4),(True,3,4),(True,4,3) ],
+        ((32, -34), True, [(False, -26, 30), (True, -12, 8)]),
         # 64
-        [ (False,3,6),(True,3,0),(True,1,0),(True,0,1),(True,0,3),(True,1,4),(True,3,4),(False,3,0),(True,4,0) ],
+        ((-16, -13), False, [(False, 0, 18), (True, 5, 5), (True, 2, 1), (True, 3, 0), (True, 12, -4), (True, 3, 0), (True, 2, 1), (True, 5, 5), (False, -24, -2), (True, 0, -24), (False, 16, 20), (True, 0, -20)]),
         # 65
-        [ (False,0,2),(True,3,2),(True,4,3),(True,3,4),(True,1,4),(True,0,3),(True,0,1),(True,1,0),(True,4,0) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 0, 32), (False, 0, -16), (True, 32, 0)]),
         # 66
-        [ (False,2,0),(True,2,5),(True,3,6),(True,4,6),(False,1,3),(True,3,3) ],
+        ((-16, -16), False, [(False, 0, 16), (True, 32, 0), (False, -9, 3), (True, 9, -3), (True, -9, -3)]),
         # 67
-        [ (False,0,-2),(True,2,-2),(True,3,-1),(True,3,4),(True,1,4),(True,0,3),(True,0,1),(True,1,0),(True,3,0) ],
+        ((34, -32), True, [(False, -20, 35), (True, -4, -4), (True, -3, -1), (True, -3, 0), (True, -2, 1), (True, -4, 3), (True, -2, 1), (True, -3, 0), (True, -3, -1), (True, -4, -4)]),
         # 68
-        [ (False,0,6),(True,0,0),(False,0,4),(True,2,4),(True,3,3),(True,3,0) ],
+        ((-16, -16), False, [(False, 8, 20), (True, 16, 0), (False, 8, 8), (True, -3, 3), (True, -3, 1), (True, -4, 0), (True, -3, -1), (True, -2, -2), (True, -1, -4), (True, 0, -17), (True, -1, -4), (True, -3, -3), (True, -3, -1), (True, -4, 0), (True, -3, 1), (True, -2, 2), (True, 0, 2), (True, 2, 2), (True, 3, 1), (True, 4, 0), (True, 3, -1), (True, 8, -6), (True, 3, -1), (True, 4, 0), (True, 4, 2), (True, 1, 2)]),
         # 69
-        [ (False,2,6),(True,2,5),(False,1,4),(True,2,4),(True,2,0),(False,1,0),(True,3,0) ],
+        ((34, -34), True, [(False, -28, 38), (True, -12, -8)]),
         # 6a
-        [ (False,2,6),(True,2,5),(False,1,4),(True,2,4),(True,2,-1),(True,1,-2),(True,0,-2) ],
+        ((-14, -8), False, [(False, 13, -8), (True, 3, 3), (True, -4, 5), (False, 16, 6), (True, -3, -4), (True, -6, -2), (True, -10, 0), (True, -6, 2), (True, -3, 5), (True, 0, 10), (True, 3, 5), (True, 6, 2), (True, 10, 0), (True, 6, -2), (True, 3, -4)]),
         # 6b
-        [ (False,0,0),(True,0,6),(False,3,0),(True,0,2),(True,3,4) ],
+        ((34, -33), True, [(False, -24, 30), (True, -10, 6), (True, -10, -6)]),
         # 6c
-        [ (False,1,6),(True,2,6),(True,2,0),(False,1,0),(True,3,0) ],
+        ((32, -39), True, [(False, -24, 38), (True, 0, 2), (True, -3, 0), (True, 0, -2), (True, 3, 0), (False, -13, 2), (True, -3, 0), (True, 0, -2), (True, 3, 0), (True, 0, 2)]),
         # 6d
-        [ (False,0,0),(True,0,4),(False,0,3),(True,1,4),(True,2,3),(True,2,0),(False,2,3),(True,3,4),(True,4,3),(True,4,0) ],
+        ((32, -41), True, [(False, -27, 40), (True, 0, 3), (True, -3, 2), (True, -4, 0), (True, -3, -2), (True, 0, -3), (True, 3, -2), (True, 4, 0), (True, 3, 2)]),
         # 6e
-        [ (False,0,0),(True,0,4),(False,0,3),(True,1,4),(True,2,4),(True,3,3),(True,3,0) ],
+        ((34, -31), True, [(False, -26, 30), (True, 0, 2), (True, -3, 0), (True, 0, -2), (True, 3, 0), (False, -13, 2), (True, -3, 0), (True, 0, -2), (True, 3, 0), (True, 0, 2)]),
         # 6f
-        [ (False,1,0),(True,0,1),(True,0,3),(True,1,4),(True,2,4),(True,3,3),(True,3,1),(True,2,0),(True,1,0) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 32, 32), (False, -5, -1), (True, -7, 1), (True, -8, 0), (True, -7, -1), (True, -3, -3), (True, -2, -6), (True, 0, -12), (True, 2, -6), (True, 3, -3), (True, 7, -1), (True, 8, 0), (True, 7, 1), (True, 3, 3), (True, 2, 6), (True, 0, 12), (True, -2, 6), (True, -3, 3)]),
         # 70
-        [ (False,0,-2),(True,0,4),(True,2,4),(True,3,3),(True,3,1),(True,2,0),(True,0,0) ],
+        ((-16, -16), False, [(False, 0, 0), (True, 14, 32), (True, 18, 0), (False, -15, 0), (True, 0, -32), (True, 15, 0), (False, -25, 16), (True, 25, 0)]),
         # 71
-        [ (False,3,0),(True,1,0),(True,0,1),(True,0,3),(True,1,4),(True,3,4),(True,3,-2) ],
+        ((-14, -12), False, [(False, 0, 0), (True, 28, 24), (False, -9, 0), (True, -10, 0), (True, -6, -2), (True, -3, -5), (True, 0, -10), (True, 3, -5), (True, 6, -2), (True, 10, 0), (True, 6, 2), (True, 3, 5), (True, 0, 10), (True, -3, 5), (True, -6, 2)]),
         # 72
-        [ (False,0,4),(True,0,0),(False,0,2),(True,2,4),(True,3,4) ],
+        ((-16, -12), False, [(False, 16, 4), (True, -2, -3), (True, -3, -1), (True, -6, 0), (True, -3, 1), (True, -2, 3), (True, 0, 4), (True, 3, 3), (True, 6, 2), (True, 7, 1), (True, 16, 0), (True, 0, 6), (True, -2, 3), (True, -3, 1), (True, -6, 0), (True, -3, -1), (True, -2, -3), (False, -16, 2), (True, 4, 2), (True, 7, 0), (True, 3, -1), (True, 2, -3), (True, 0, -16), (True, 2, -3), (True, 3, -1), (True, 7, 0), (True, 4, 2)]),
         # 73
-        [ (False,3,4),(True,1,4),(True,0,3),(True,1,2),(True,2,2),(True,3,1),(True,2,0),(True,0,0) ],
+        ((34, -33), True, [(False, -29, 32), (True, 0, 3), (True, -3, 2), (True, -4, 0), (True, -3, -2), (True, 0, -3), (True, 3, -2), (True, 4, 0), (True, 3, 2)]),
         # 74
-        [ (False,1,6),(True,1,0),(True,3,0),(False,0,4),(True,3,4) ],
+        ((-16, -8), False, [(False, 16, 24), (True, 0, -2), (True, 3, 0), (True, 0, 2), (True, -3, 0), (False, 2, -10), (True, -1, -3), (True, -2, -2), (True, -8, -1), (True, -5, -2), (True, -2, -3), (True, 0, -6), (True, 2, -3), (True, 5, -2), (True, 18, 0), (True, 5, 2), (True, 2, 3)]),
         # 75
-        [ (False,0,4),(True,0,1),(True,1,0),(True,3,0),(True,3,4) ],
+        ((-31, -8), False, [(False, 31, -8), (True, 0, 21), (False, -1, 9), (True, 0, 2), (True, 2, 0), (True, 0, -2), (True, -2, 0)]),
         # 76
-        [ (False,0,4),(True,0,2),(True,2,0),(True,4,2),(True,4,4) ],
+        ((56, -42), True, [(False, -16, 46), (True, -17, -7), (True, -4, -1), (True, -6, 0), (True, -4, 1), (True, -18, 6), (True, -4, 1), (True, -6, 0), (True, -4, -1), (True, -17, -7)]),
         # 77
-        [ (False,0,4),(True,0,1),(True,1,0),(True,2,1),(True,2,3),(False,2,1),(True,3,0),(True,4,1),(True,4,4) ],
+        ((32, -41), True, [(False, -16, 44), (True, -5, -5), (True, -2, -1), (True, -3, 0), (True, -3, 1), (True, -6, 4), (True, -3, 1), (True, -3, 0), (True, -2, -1), (True, -5, -5)]),
         # 78
-        [ (False,0,4),(True,4,0),(False,0,0),(True,4,4) ],
-        # 79
-        [ (False,0,-2),(True,4,2),(True,4,4),(False,0,4),(True,0,2),(True,2,0) ],
-        # 7a
-        [ (False,0,4),(True,3,4),(True,0,0),(True,3,0) ],
-        # 7b
-        [ (False,3,7),(True,2,7),(True,1,6),(True,1,4),(True,0,3),(True,1,2),(True,1,0),(True,2,-1),(True,3,-1) ],
-        # 7c
-        [ (False,2,7),(True,2,-1) ],
-        # 7d
-        [ (False,1,7),(True,2,7),(True,3,6),(True,3,4),(True,4,3),(True,3,2),(True,3,0),(True,2,-1),(True,1,-1) ],
-        # 7e
-        [ (False,0,5),(True,1,6),(True,3,4),(True,4,5) ]
+        ((56, -34), True, [(False, -16, 38), (True, -17, -7), (True, -4, -1), (True, -6, 0), (True, -4, 1), (True, -18, 6), (True, -4, 1), (True, -6, 0), (True, -4, -1), (True, -17, -7)]),
     ]
 
-    # Differences of charsets 1-4 wrt charset 0
-    # Key is:
-    # [0]   Charset no.
-    # [1]   Character code
-    DIFFS = {
-        (1 , 0x5c): [ (False,0,2),(True,1,2),(True,2,0),(True,3,5),(True,4,5) ],
-        (1 , 0x5e): [ (False,2,6),(True,2,0),(False,0,4),(True,2,6),(True,4,4) ],
-        (1 , 0x7b): [ (False,0,5),(True,1,6),(True,3,4),(True,4,5),(False,1,0),(True,1,6),(False,3,0),(True,3,4) ],
-        (1 , 0x7c): [ (False,2,7),(True,2,-1),(False,0,3),(True,4,3) ],
-        (1 , 0x7d): [ (False,0,3),(True,4,3),(False,3,2),(True,4,3),(True,3,4) ],
-        (2 , 0x23): [ (False,4,5),(True,4,6),(True,3,6),(True,2,4),(True,2,1),(True,1,0),(True,0,0),(True,0,1),(True,1,2),(True,3,0),(True,4,1),(False,1,4),(True,3,4),(False,1,3),(True,3,3) ],
-        (2 , 0x27): [ (False,1,6),(True,3,9) ],
-        (2 , 0x5c): [ (False,4,1),(True,3,0),(True,2,0),(True,1,1),(True,1,3),(True,2,4),(True,3,4),(True,4,3),(False,2,0),(True,1,-1) ],
-        (2 , 0x7b): [ (False,1,8),(True,1,7),(False,3,8),(True,3,7) ],
-        (2 , 0x7c): [ (False,2,6),(True,1,7),(True,2,8),(True,3,7),(True,2,6) ],
-        (2 , 0x7d): [ (False,1,6),(True,1,5),(False,3,6),(True,3,5) ],
-        (2 , 0x7e): [ (False,3,5),(True,3,6) ],
-        (3 , 0x23): [ (False,4,5),(True,4,6),(True,3,6),(True,2,4),(True,2,1),(True,1,0),(True,0,0),(True,0,1),(True,1,2),(True,3,0),(True,4,1),(False,1,4),(True,3,4),(False,1,3),(True,3,3) ],
-        (3 , 0x5b): [ (False,0,1),(True,1,0),(True,3,0),(True,4,1),(True,4,5),(True,3,6),(True,1,6),(True,0,5),(True,0,1),(True,4,5) ],
-        (3 , 0x5c): [ (False,4,6),(True,2,6),(True,2,0),(True,4,0),(False,4,3),(True,1,3),(False,2,6),(True,0,0) ],
-        (3 , 0x5d): [ (False,1,0),(True,0,1),(True,0,3),(True,1,4),(True,2,4),(True,3,3),(True,3,1),(True,2,0),(True,1,0),(False,0,0),(True,3,4) ],
-        (3 , 0x5e): [ (False,4,1),(True,3,0),(True,2,1),(True,2,3),(True,3,4),(True,4,3),(True,3,2),(True,1,2),(True,0,1),(True,1,0),(True,2,1),(False,2,3),(True,1,4),(True,0,3) ],
-        (3 , 0x7b): [ (False,1,8),(True,1,7),(False,3,8),(True,3,7) ],
-        (3 , 0x7c): [ (False,2,6),(True,1,7),(True,2,8),(True,3,7),(True,2,6) ],
-        (3 , 0x7d): [ (False,1,6),(True,1,5),(False,3,6),(True,3,5) ],
-        (3 , 0x7e): [ (False,2,4),(True,1,5),(True,2,6),(True,3,5),(True,2,4) ],
-        (4 , 0x23): [ (False,2,6),(True,2,5),(False,2,4),(True,2,3),(True,1,3),(True,0,2),(True,0,1),(True,1,0),(True,3,0),(True,4,1) ],
-        (4 , 0x27): [ (False,1,6),(True,3,9) ],
-        (4 , 0x5c): [ (False,2,6),(True,2,5),(False,2,4),(True,2,0) ],
-        (4 , 0x7b): [ (False,-1,7),(True,1,8),(True,4,7),(True,6,8) ],
-        (4 , 0x7c): [ (False,0,7),(True,1,8),(True,3,6),(True,4,7) ],
-        (4 , 0x7d): [ (False,-1,6),(True,1,7),(True,4,6),(True,6,6) ],
-        (4 , 0x7e): [ (False,0,6),(True,1,7),(True,3,5),(True,4,6) ]
-    }
+    XLATE = [
+        # Charset 1
+        {
+            0x27: 0x5f,
+            0x5c: 0x60,
+            0x5e: 0x61,
+            0x5f: 0x62,
+            0x60: 0x63,
+            0x7b: 0x64,
+            0x7c: 0x65,
+            0x7d: 0x66,
+            0x7e: 0x67
+        },
+        # Charset 2
+        {
+            0x23: 0x68,
+            0x27: 0x69,
+            0x5c: 0x6a,
+            0x5e: 0x6b,
+            0x5f: 0x62,
+            0x60: 0x63,
+            0x7b: 0x6c,
+            0x7c: 0x6d,
+            0x7d: 0x6e,
+            0x7e: 0x5f
+        },
+        # Charset 3
+        {
+            0x23: 0x68,
+            0x5b: 0x6f,
+            0x5c: 0x70,
+            0x5d: 0x71,
+            0x5e: 0x72,
+            0x5f: 0x62,
+            0x7b: 0x6c,
+            0x7c: 0x6d,
+            0x7d: 0x6e,
+            0x7e: 0x73
+        },
+        # Charset 4
+        {
+            0x23: 0x74,
+            0x27: 0x69,
+            0x5c: 0x75,
+            0x5e: 0x6b,
+            0x5f: 0x62,
+            0x7b: 0x76,
+            0x7c: 0x77,
+            0x7d: 0x78,
+            0x7e: 0x67
+        }
+    ]
 
-    # Chars with auto-backspace
-    AUTOBS = frozenset([
-        (1 , 0x5f) , (1 , 0x60) , (1 , 0x7e) ,
-        (2 , 0x27) , (2 , 0x5e) , (2 , 0x5f) , (2 , 0x60) , (2 , 0x7b) , (2 , 0x7c) , (2 , 0x7d) ,
-        (3 , 0x5f) , (3 , 0x7b) , (3 , 0x7c) , (3 , 0x7d) , (3 , 0x7e) ,
-        (4 , 0x27) , (4 , 0x5e) , (4 , 0x5f) , (4 , 0x7b) , (4 , 0x7c) , (4 , 0x7d) , (4 , 0x7e)])
 
     def __init__(self):
         pass
 
-    def get_char(self , charset , char):
-        if char < 0x20 or char > 0x7e:
-            return None
-        k = (charset , char)
-        d = self.DIFFS.get(k)
-        if d != None:
-            return d
-        else:
-            return self.CHARSET0[ char - 0x20 ]
+    def translate_code(self, charset, char):
+        code = None
+        if 1 <= charset <= 4:
+            d = self.XLATE[ charset - 1 ]
+            code = d.get(char)
+        if code is None and 0x21 <= char <= 0x7e:
+            code = char - 0x21
+        return code
 
-    def has_auto_backspace(self , charset , char):
-        k = (charset , char)
-        return k in self.AUTOBS
+    def get_glyph(self , code):
+        return self.FONT[ code ]
 
 class Plotter:
     # Line type patterns
     LT_PATTERNS = {
-        # Line typ 1
+        # Line type 1
         1: [ 0 , 100 ],
         # Line type 2
         2: [ 50 , 50 ],
@@ -577,91 +675,91 @@ class Plotter:
         self.initialize()
 
     def clear_status(self):
-        self.srq_pending = False
+        self.pp_accum = 0
+        self.srq_accum = 0
         self.io.set_rsv_state(False)
-        self.set_in_masks = (223 , 0 , 0)
+        self.io.set_pp_state(False)
+        self.status = 0
+        self.set_in_masks = [223, 0, 0]
+        # Set "ready for data"
+        self.set_status_1(0x10)
 
     def set_defaults(self):
-        self.clear_status()
+        # Clear scaling mode
+        # IM;
+        # SR;
+        # DC;
+        # DR;
+        # IW;
+        # LT;
+        # CA;
+        # CS;
+        # SS;
+        # SL;
+        # SM;
+        # TL;
+        # VS;
+        # VN;
+        # AP;
+        # Pattern length = 4.0
+        self.scaling = None
+        self.set_in_masks = [223, 0, 0]
+        self.text_size = Point(0.0075, 0.015)
+        self.text_size_rel = True
+        self.text_dir = Point(1.0, 0.0)
+        self.text_dir_rel = True
+        self.text_drawing = False
         self.window = Rectangle(Point(MIN_X_PHY , MIN_Y_PHY) , Point(MAX_X_PHY , MAX_Y_PHY))
         self.line_type = self.LT_SOLID
         self.line_type_pct = 4
-        self.update_pen_zone()
-        self.scaling = None
-        self.text_dir_x = 1
-        self.text_dir_y = 0
-        self.text_dir_rel = True
-        self.text_slant = 0.0
-        self.text_size_x = 0.0075
-        self.text_size_y = 0.015
-        self.text_size_rel = True
-        # [0]   Standard set
-        # [1]   Alternate set
-        self.text_sets = [ 0 , 0 ]
+        self.text_sets = [ 0, 0 ]
         self.text_cur_set = 0
+        self.text_slant = 0.0
         self.text_symbol = None
-        self.compute_text_vars()
         self.neg_tick = 0.005
         self.pos_tick = 0.005
-
-    def compute_text_vars(self):
-        x = self.text_dir_x
-        y = self.text_dir_y
-        if self.text_dir_rel:
-            x *= abs(self.P1.x - self.P2.x)
-            y *= abs(self.P1.y - self.P2.y)
-        self.text_dir = math.atan2(y , x)
-        cdir = math.cos(self.text_dir)
-        sdir = math.sin(self.text_dir)
-        w = self.text_size_x
-        h = self.text_size_y
-        if self.text_size_rel:
-            w *= abs(self.P1.x - self.P2.x)
-            h *= abs(self.P1.y - self.P2.y)
-        self.text_xx = w * cdir / 4
-        self.text_yx = w * sdir / 4
-        self.text_xy = h * (self.text_slant * cdir - sdir) / 8
-        self.text_yy = h * (self.text_slant * sdir + cdir) / 8
-        s = w * 1.5
-        self.text_char_dx = s * cdir
-        self.text_char_dy = s * sdir
-        l = h * 2
-        self.text_line_dx = l * sdir
-        self.text_line_dy = -l * cdir
-        self.text_center_off_x = int(-self.text_char_dx / 3 + self.text_line_dx * 3 / 16)
-        self.text_center_off_y = int(-self.text_char_dy / 3 + self.text_line_dy * 3 / 16)
+        self.compute_text_dir()
+        # Variables defined to avoid NameError's, value is not important
+        self.text_char_width = 1
+        self.text_char_height = 1
+        self.char_offset = Point(0, 0)
+        self.update_text_size()
 
     def initialize(self):
         self.clear_status()
-        self.status = 0
-        self.set_status(0x18)
         self.set_error(0)
         self.P1 = Point(DEF_X_P1 , DEF_Y_P1)
         self.P2 = Point(DEF_X_P2 , DEF_Y_P2)
+        self.set_defaults()
+        self.set_status_1(8)
         # Stored pen positions:
-        # pen           Current pen position in plotter units. Unclipped, can be in nearby zone.
-        # last_pen      Current pen position in plotter units. Clipped with current window.
-        # last_cmd_pen  Commanded pen position, optionally scaled. Can be in nearby zone.
-        self.pen = Point(0 , 0)
-        self.last_pen = Point(0 , 0)
-        self.last_cmd_pen = Point(0 , 0)
+        # pen           Pen position in PU, within mech. limits
+        # last_pen      Commanded pen position in PU. Clipped with current window.
+        # pen_zone      Status of last_pen
+        # scaled_pen    Commanded pen position in UU. Can be in nearby zone.
+        # fe06/fe07
+        self.pen = Point(RST_X, RST_Y)
+        # fe3f/fe40
+        self.last_pen = Point(RST_X, RST_Y)
+        # fef2/fef3
+        self.scaled_pen = Point(RST_X, RST_Y)
         self.set_pen_zone(self.P_IN_WINDOW)
-        self.text_cr_point = Point(0 , 0)
         # Position where last segment/point ended
         self.last_pen_draw = Point(NO_X_PEN , NO_Y_PEN)
         # Position where pen last went down
         self.last_pen_down = Point(NO_X_PEN , NO_Y_PEN)
+        # pen_down      fe4d Actual up/dn state of pen
+        # cmd_pen_down  fe30 Commanded up/dn state of pen
+        self.cmd_pen_down = False
         # Ensure pen status update
         self.pen_down = True
         self.set_pen_down(False)
-        self.set_defaults()
 
     def is_drawing(self):
         return self.pen_down and self.pen_no != 0
 
     def set_pen_down(self , state):
         if not self.pen_down and state:
-            self.set_status_1(0x01)
             self.last_pen_down = self.last_pen
         elif self.is_drawing() and not state and self.last_pen == self.last_pen_down:
             # Draw a single point (null length segment) when these conditions are true:
@@ -682,182 +780,185 @@ class Plotter:
         self.io.set_ol_led(zone)
 
     def update_pen_zone(self):
-        if self.pen_zone != self.P_FARAWAY:
-            self.set_pen_zone(self.P_IN_WINDOW if self.window.contains(self.pen) else self.P_NEARBY)
+        self.set_pen_zone(self.P_IN_WINDOW if self.last_pen in self.window else self.P_NEARBY)
 
-    def scale_factors(self):
-        if self.scaling:
-            self.scale_xf = (self.P2.x - self.P1.x) / (self.scaling.pur.x - self.scaling.pll.x)
-            self.scale_yf = (self.P2.y - self.P1.y) / (self.scaling.pur.y - self.scaling.pll.y)
-            self.scale_ux = self.P1.x - int(self.scale_xf * self.scaling.pll.x)
-            self.scale_uy = self.P1.y - int(self.scale_yf * self.scaling.pll.y)
+    def update_pen_zone_and_up(self):
+        # 02b4
+        self.last_pen = deepcopy(self.pen)
+        self.update_pen_zone()
+        self.cmd_pen_up()
 
-    def scale(self , p):
-        if self.scaling:
-            xsc = int(self.scale_xf * p.x) + self.scale_ux
-            ysc = int(self.scale_yf * p.y) + self.scale_uy
-            return Point(xsc , ysc)
-        else:
-            return p
+    def check_scaled_coord(self, coord):
+        if not MIN_INT_SC <= coord <= MAX_INT_SC:
+            raise PosOverflow()
 
-    def inverse_scale(self , p):
-        if self.scaling:
-            xisc = int((p.x - self.scale_ux) / self.scale_xf)
-            yisc = int((p.y - self.scale_uy) / self.scale_yf)
-            return Point(xisc , yisc)
-        else:
-            return p
-
-    # Scale point p (if scaling is enabled) and classify its position
-    # Returns z , psc
-    # z is zone of p (In window, nearby or faraway)
-    # psc is p scaled
-    def get_pt_zone(self , p , relative = False):
-        if self.scaling:
-            if p.x < MIN_INT_SC or p.x > MAX_INT_SC or \
-              p.y < MIN_INT_SC or p.y > MAX_INT_SC:
-                return self.P_FARAWAY , p
+    def inverse_scale_and_update(self):
+        # 05a3
+        try:
+            p2p1_diff_x = self.P2.x - self.P1.x
+            if p2p1_diff_x >= 0:
+                x = self.scaling.pll.x + self.scale_coord(self.last_pen.x - self.P1.x, p2p1_diff_x, self.scaling.pur.x - self.scaling.pll.x)
             else:
-                if relative:
-                    p.x += self.last_cmd_pen.x
-                    p.y += self.last_cmd_pen.y
-                    if p.x < MIN_INT_SC or p.x > MAX_INT_SC or \
-                      p.y < MIN_INT_SC or p.y > MAX_INT_SC:
-                        return self.P_FARAWAY , p
-                self.last_cmd_pen = p.dup()
-                psc = self.scale(p)
-                if psc.x < MIN_INT_SC or psc.x > MAX_INT_SC or \
-                  psc.y < MIN_INT_SC or psc.y > MAX_INT_SC:
-                    return self.P_FARAWAY , psc
-                elif self.window.contains(psc):
-                    return self.P_IN_WINDOW , psc
-                else:
-                    return self.P_NEARBY , psc
-        else:
-            if p.x < MIN_INT_NO_SC or p.x > MAX_INT_NO_SC or \
-              p.y < MIN_INT_NO_SC or p.y > MAX_INT_NO_SC:
-                return self.P_FARAWAY , p
+                x = self.scaling.pur.x + self.scale_coord(self.last_pen.x - self.P2.x, -p2p1_diff_x, self.scaling.pll.x - self.scaling.pur.x)
+            self.check_scaled_coord(x)
+            p2p1_diff_y = self.P2.y - self.P1.y
+            if p2p1_diff_y >= 0:
+                y = self.scaling.pll.y + self.scale_coord(self.last_pen.y - self.P1.y, p2p1_diff_y, self.scaling.pur.y - self.scaling.pll.y)
             else:
-                if relative:
-                    p.x += self.last_cmd_pen.x
-                    p.y += self.last_cmd_pen.y
-                    if p.x < MIN_INT_NO_SC or p.x > MAX_INT_NO_SC or \
-                      p.y < MIN_INT_NO_SC or p.y > MAX_INT_NO_SC:
-                        return self.P_FARAWAY , p
-                self.last_cmd_pen = p.dup()
-                if self.window.contains(p):
-                    return self.P_IN_WINDOW , p
-                else:
-                    return self.P_NEARBY , p
+                y = self.scaling.pur.y + self.scale_coord(self.last_pen.y - self.P2.y, -p2p1_diff_y, self.scaling.pll.y - self.scaling.pur.y)
+            self.check_scaled_coord(y)
+            self.scaled_pen = Point(x, y)
+        except PosOverflow:
+            self.set_pen_zone(self.P_FARAWAY)
 
     def segment_output(self , s):
         if not s.null_len() or s.p1 != self.last_pen_draw:
             s.pen_no = self.pen_no
             self.io.draw_segment(s)
-            self.last_pen_draw = s.p2.dup()
+            self.last_pen_draw = deepcopy(s.p2)
 
-    def draw_segment(self , s , force_solid = False):
-        if self.is_drawing():
-            # Line type
-            if self.line_type == self.LT_SOLID or force_solid:
-                # Solid
-                self.segment_output(s)
-            elif self.line_type == self.LT_2_POINTS:
-                # Two dots (0)
-                self.draw_point(s.p1)
-                self.draw_point(s.p2)
+    def draw_to_point(self , dest, pen_down):
+        # 08d7
+        s = Segment(self.last_pen, dest)
+        s_clip = self.window.clip_segment(s)
+        if s_clip:
+            if pen_down and self.pen_no != 0:
+                self.segment_output(deepcopy(s_clip))
+            self.pen = s_clip.p2
+            self.last_pen = dest
+            zone = self.P_IN_WINDOW if s_clip.p2 == dest else self.P_NEARBY
+            self.set_pen_zone(zone)
+            self.set_pen_down(pen_down if zone == self.P_IN_WINDOW else False)
+        else:
+            # Segment is entirely outside the window
+            # Do not move pen
+            self.last_pen = dest
+            self.set_pen_zone(self.P_NEARBY)
+
+    def draw_to_point_sym(self, dest, pen_down):
+        self.draw_to_point(dest, pen_down)
+        if self.text_symbol is not None:
+            # Draw symbol if SM mode enabled
+            glyph = self.font.get_glyph(self.text_symbol)
+            # Center cell
+            self.pos_in_cell = Point(glyph[ 0 ][ 0 ] * 2, glyph[ 0 ][ 1 ] *  2)
+            self.text_ref_point = deepcopy(self.last_pen)
+            self.char_offset = Point(0, 0)
+            self.draw_char(glyph)
+            self.pos_in_cell = Point(0, 0)
+            # Reposition pen at starting point
+            self.draw_to_point_char(False)
+
+    def draw_pattern_line_sym(self , dest):
+        if self.line_type == self.LT_SOLID or not self.cmd_pen_down:
+            self.draw_to_point_sym(dest, self.cmd_pen_down)
+        elif self.line_type == self.LT_2_POINTS:
+            # Two dots (0)
+            self.draw_to_point_sym(dest, False)
+            if self.pen_zone == self.P_IN_WINDOW and self.pen_no != 0:
+                self.draw_point(dest)
+        else:
+            # Generic pattern 1..6
+            if dest == self.last_pen:
+                self.draw_to_point_sym(dest, True)
             else:
-                # Generic pattern 1..6
                 pat = self.LT_PATTERNS[ self.line_type ]
-                one_pct = (self.P1.dist(self.P2) * self.line_type_pct) / 10000
-                seg_len = s.length()
-                seg_used = 0
-                dx = s.p2.x - s.p1.x
-                dy = s.p2.y - s.p1.y
-                while seg_used < seg_len:
-                    pat_rem_pct = pat[ self.line_pat_idx ] - self.line_pat_used
-                    pat_rem = pat_rem_pct * one_pct
-                    run = min(pat_rem , seg_len - seg_used)
-                    if (self.line_pat_idx & 1) == 0:
-                        # Draw
-                        seg_frac = seg_used / seg_len
-                        new_seg_p1 = Point(int(s.p1.x + dx * seg_frac) , int(s.p1.y + dy * seg_frac))
-                        seg_used += run
-                        seg_frac = seg_used / seg_len
-                        new_seg_p2 = Point(int(s.p1.x + dx * seg_frac) , int(s.p1.y + dy * seg_frac))
-                        self.segment_output(Segment(new_seg_p1 , new_seg_p2))
+                while True:
+                    if self.line_pat_rem == 0:
+                        self.line_pat_idx += 1
+                        if self.line_pat_idx >= len(pat):
+                            self.line_pat_idx = 0
+                        self.line_pat_rem = int((self.line_type_pct * self.P1.dist(self.P2) * pat[ self.line_pat_idx ]) / 10000)
+                    rem = int(self.last_pen.dist(dest))
+                    if rem <= self.line_pat_rem:
+                        self.line_pat_rem -= rem
+                        self.draw_to_point_sym(dest, (self.line_pat_idx & 1) == 0)
+                        break
                     else:
-                        # Gap
-                        seg_used += run
-                    pat_used_pct = self.line_pat_used + run / one_pct
-                    if pat_used_pct < pat[ self.line_pat_idx ]:
-                        self.line_pat_used = pat_used_pct
-                    else:
-                        self.line_pat_used = 0
-                        self.line_pat_idx = (self.line_pat_idx + 1) % len(pat)
-        self.last_pen = s.p2
-
-    def draw_clipped_segment(self , s , force_solid = False):
-        s_clip = self.window.clip_segment(s)
-        if s_clip:
-            self.draw_segment(s_clip , force_solid)
-        if self.text_symbol:
-            pt = s.p2.dup()
-            pt.x += self.text_center_off_x
-            pt.y += self.text_center_off_y
-            self.draw_char(pt , self.text_symbol_charset , self.text_symbol)
-
-    def draw_always_clipped_segment(self , s):
-        # pen_no != 0 must be checked outside this fn
-        s_clip = self.window.clip_segment(s)
-        if s_clip:
-            self.segment_output(s_clip)
-            self.last_pen = s_clip.p2
+                        p = self.line_pat_rem / rem
+                        delta = dest - self.last_pen
+                        pdest = Point(self.last_pen.x + int(p * delta.x), self.last_pen.y + int(p * delta.y))
+                        self.draw_to_point(pdest, (self.line_pat_idx & 1) == 0)
+                        self.line_pat_rem = 0
 
     def draw_point(self , p):
-        if self.is_drawing():
-            self.segment_output(Segment(p.dup() , p.dup()))
-        self.last_pen = p
+        self.segment_output(Segment(p , p))
 
-    def char_grid_to_pt(self , p , x , y):
-        px = self.text_xx * x + self.text_xy * y + p.x
-        py = self.text_yx * x + self.text_yy * y + p.y
-        return Point(px , py)
+    def scale_to_p1p2(self, pt):
+        pt.x *= abs(self.P1.x - self.P2.x)
+        pt.y *= abs(self.P1.y - self.P2.y)
 
-    def draw_char(self , p , charset , c):
-        if self.pen_no != 0:
-            shape = self.font.get_char(charset , c)
-            prev_pt = p.dup()
-            if shape is not None:
-                for d , x , y in shape:
-                    next_pt = self.char_grid_to_pt(p , x , y)
-                    if d:
-                        self.draw_always_clipped_segment(Segment(prev_pt , next_pt))
-                    prev_pt = next_pt
+    def update_text_size(self):
+        tmp = deepcopy(self.text_size)
+        if self.text_size_rel:
+            self.scale_to_p1p2(tmp)
+        prev_width = self.text_char_width
+        self.text_char_width = int(tmp.x * 1.5)
+        prev_height = self.text_char_height
+        self.text_char_height = int(tmp.y * 2)
+        self.char_offset.x = self.char_offset.x * prev_width
+        if self.text_char_width != 0:
+            self.char_offset.x /= self.text_char_width
+        self.char_offset.y = self.char_offset.y * prev_height
+        if self.text_char_height != 0:
+            self.char_offset.y /= self.text_char_height
 
-    def adjust_pen_after_char(self):
-        # Adjust pen zone and last_cmd_pen according to final pen position
-        # after plotting characters
-        if self.scaling:
-            if not MIN_INT_SC <= self.pen.x <= MAX_INT_SC or \
-              not MIN_INT_SC <= self.pen.y <= MAX_INT_SC:
-                z = self.P_FARAWAY
-            elif self.window.contains(self.pen):
-                z = self.P_IN_WINDOW
-            else:
-                z = self.P_NEARBY
-            if z != self.P_FARAWAY:
-                new_pen = self.inverse_scale(self.pen)
-                if not MIN_INT_SC <= new_pen.x <= MAX_INT_SC or \
-                  not MIN_INT_SC <= new_pen.y <= MAX_INT_SC:
-                    z = self.P_FARAWAY
-                else:
-                    self.last_cmd_pen = new_pen
+    def compute_text_dir(self):
+        tmp = deepcopy(self.text_dir)
+        if self.text_dir_rel:
+            self.scale_to_p1p2(tmp)
+        l = math.sqrt(tmp.x * tmp.x + tmp.y * tmp.y)
+        if l < 1.0e-3:
+            self.text_direction = Point(0, 0)
         else:
-            z , _ = self.get_pt_zone(self.pen)
-        self.set_pen_zone(z)
-        if z == self.P_FARAWAY:
-            raise PosOverflow()
+            self.text_direction = Point(tmp.x / l, tmp.y / l)
+
+    def start_text_drawing(self):
+        # 14f5
+        if not self.text_drawing:
+            self.text_drawing = True
+            self.text_ref_point = deepcopy(self.last_pen)
+            self.char_offset = Point(0, 0)
+
+    def check_overflow(self, coord):
+        if coord < -32768:
+            coord = -32768
+            self.set_error(6)
+        elif coord > 32767:
+            coord = 32767
+            self.set_error(6)
+        return coord
+
+    def clamped_scaling(self, coord, scale):
+        tmp = int(coord * scale)
+        return self.check_overflow(tmp)
+
+    def rotate_text_point(self, pt):
+        tmpx = self.check_overflow(int(pt.x * self.text_direction.y))
+        tmpy = self.check_overflow(int(pt.y * self.text_direction.x))
+        return self.check_overflow(tmpx + tmpy)
+
+    def draw_to_point_char(self, pen_down):
+        # 15a1
+        if self.pen_zone == self.P_FARAWAY:
+            return
+        tmp = Point(self.pos_in_cell.x / 96.0, self.pos_in_cell.y / 128.0)
+        tmp.x += self.char_offset.x
+        tmp.x = self.clamped_scaling(tmp.x, self.text_char_width)
+        tmp.x += int(self.text_slant * self.clamped_scaling(tmp.y, self.text_char_height))
+        tmp.x = self.check_overflow(tmp.x)
+        tmp.y += self.char_offset.y
+        tmp.y = self.clamped_scaling(tmp.y, self.text_char_height)
+        destx = self.check_overflow(self.text_ref_point.x + self.rotate_text_point(Point(-tmp.y, tmp.x)))
+        desty = self.check_overflow(self.text_ref_point.y + self.rotate_text_point(Point(tmp.x, tmp.y)))
+        self.draw_to_point(Point(destx, desty), pen_down)
+
+    def draw_char(self, glyph):
+        # 152b
+        for pen, dx, dy in glyph[ 2 ]:
+            self.pos_in_cell.x += 2 * dx
+            self.pos_in_cell.y += 2 * dy
+            self.draw_to_point_char(pen)
 
     def set_error(self , err_no):
         if err_no == 0:
@@ -865,33 +966,33 @@ class Plotter:
             self.io.set_error_led(False)
             self.err_no = 0
             self.set_status_0(0x20)
-        elif (1 << (err_no - 1)) & self.set_in_masks[ 0 ]:
+        elif ((1 << (err_no - 1)) & self.set_in_masks[ 0 ]) != 0 and self.err_no == 0:
             self.io.set_error_led(True)
             self.err_no = err_no
             self.set_status_1(0x20)
 
-    def update_status(self , prev_status):
-        self.io.set_status_byte(self.status & 0xbf)
-        to_1 = ~prev_status & self.status
-        if to_1 & self.set_in_masks[ 1 ]:
-            self.io.set_rsv_state(True)
-            self.srq_pending = True
-        elif self.srq_pending and (self.status & self.set_in_masks[ 1 ]) == 0:
-            self.io.set_rsv_state(False)
-            self.srq_pending = False
-        self.io.set_pp_state(self.status & self.set_in_masks[ 2 ])
-
-    def set_status(self , status):
-        if self.status != status:
-            save = self.status
-            self.status = status
-            self.update_status(save)
-
     def set_status_1(self , mask):
-        self.set_status(self.status | mask)
+        self.status |= mask
+        self.io.set_status_byte(self.status & 0x3f)
+        tmp = self.status & self.set_in_masks[ 2 ]
+        if tmp:
+            self.pp_accum |= tmp
+            self.io.set_pp_state(True)
+        tmp = self.status & self.set_in_masks[ 1 ]
+        if tmp:
+            self.srq_accum |= tmp
+            self.io.set_rsv_state(True)
 
     def set_status_0(self , mask):
-        self.set_status(self.status & ~mask)
+        mask = ~mask;
+        self.status &= mask
+        self.io.set_status_byte(self.status & 0x3f)
+        self.pp_accum &= mask
+        if not self.pp_accum:
+            self.io.set_pp_state(False)
+        self.srq_accum &= mask
+        if not self.srq_accum:
+            self.io.set_rsv_state(False)
 
     def check_args(self , args , arg_type , min_args , max_args):
         l = len(args)
@@ -923,36 +1024,69 @@ class Plotter:
             if 0 <= args[ 0 ] <= 4:
                 self.text_sets[ 1 ] = args[ 0 ]
             else:
-                raise InvalidArg()
+                raise UnknownCharSet()
         else:
             self.text_sets[ 1 ] = 0
-        return None
 
-    # CP: Character plot
+    def zero_char_offset_x(self):
+        # 14de
+        self.char_offset = Point(0, self.char_offset.y)
+
+    def move_char_offset_x(self, delta_x):
+        # 14ed
+        x = self.char_offset.x + delta_x
+        x = max(min(x, 32767), -32768)
+        self.char_offset = Point(x, self.char_offset.y)
+
+    def move_char_offset_y(self, delta_y):
+        # 14e5
+        y = self.char_offset.y + delta_y
+        y = max(min(y, 32767), -32768)
+        self.char_offset = Point(self.char_offset.x, y)
+
+    def zero_pos_in_cell_and_draw(self, pen_down):
+        # 1453
+        self.pos_in_cell = Point(0, 0)
+        self.draw_to_point_char(pen_down)
+
+    def move_char_offset_y_and_draw(self, delta_y):
+        # 1450
+        self.move_char_offset_y(delta_y)
+        self.zero_pos_in_cell_and_draw(False)
+
+    def carriage_return(self):
+        # 144e
+        self.zero_char_offset_x()
+        self.zero_pos_in_cell_and_draw(False)
+
+    def move_to_next_char(self):
+        # 1441
+        self.move_char_offset_x(1)
+        self.zero_pos_in_cell_and_draw(False)
+
+    # CP: Character positioning
     # 0 to 2 dec parameters
     def cmd_CP(self , args):
-        args = self.get_args(args , ParsedFixArg , 0 , 2)
-        save_pen = self.pen.dup()
-        if not args:
-            # CRLF
-            if self.pen_zone != self.P_FARAWAY:
-                self.text_cr_point.x += self.text_line_dx
-                self.text_cr_point.y += self.text_line_dy
-                self.pen = self.text_cr_point.dup()
-                # It's assumed here that line type is always solid
-                self.draw_clipped_segment(Segment(save_pen , self.pen) , True)
-                self.adjust_pen_after_char()
-        elif len(args) == 2 and MIN_DEC <= args[ 0 ] <= MAX_DEC and \
-          MIN_DEC <= args[ 1 ] <= MAX_DEC:
-            if self.pen_zone != self.P_FARAWAY:
-                self.pen.x += args[ 0 ] * self.text_char_dx - args[ 1 ] * self.text_line_dx
-                self.pen.y += args[ 0 ] * self.text_char_dy - args[ 1 ] * self.text_line_dy
-                self.text_cr_point = self.pen.dup()
-                self.draw_clipped_segment(Segment(save_pen , self.pen) , True)
-                self.adjust_pen_after_char()
-        else:
-            raise InvalidArg()
-        return None
+        try:
+            self.start_text_drawing()
+            args = self.get_args(args , ParsedFixArg , 0 , 2)
+            if not args:
+                # CRLF
+                self.zero_char_offset_x()
+                self.move_char_offset_y_and_draw(-1)
+            elif len(args) == 2:
+                if MIN_DEC <= args[ 0 ] <= MAX_DEC and \
+                   MIN_DEC <= args[ 1 ] <= MAX_DEC:
+                    self.move_char_offset_x(args[ 0 ])
+                    self.move_char_offset_y(args[ 1 ])
+                    self.zero_pos_in_cell_and_draw(self.cmd_pen_down)
+                else:
+                    raise InvalidArg()
+            else:
+                raise WrongNumArgs()
+        finally:
+            if self.scaling is not None:
+                self.inverse_scale_and_update()
 
     # CS: Select standard character set
     # 0 or 1 int parameter
@@ -962,82 +1096,75 @@ class Plotter:
             if 0 <= args[ 0 ] <= 4:
                 self.text_sets[ 0 ] = args[ 0 ]
             else:
-                raise InvalidArg()
+                raise UnknownCharSet()
         else:
             self.text_sets [ 0 ] = 0
-        return None
 
     # DF: Set defaults
     # No parameters
     def cmd_DF(self , args):
         self.check_no_arg(args)
         self.set_defaults()
-        return None
 
     # DI: Set absolute direction
     # 0 or 2 dec parameters
     def cmd_DI(self , args):
         args = self.get_args(args , ParsedFixArg , 0 , 2)
         if not args:
-            self.text_dir_x = 1.0
-            self.text_dir_y = 0.0
+            self.text_dir = Point(1.0, 0.0)
             self.text_dir_rel = False
-            self.compute_text_vars()
-            self.text_cr_point = self.pen.dup()
-        elif len(args) == 2 and MIN_DEC <= args[ 0 ] <= MAX_DEC and \
-          MIN_DEC <= args[ 1 ] <= MAX_DEC and (args[ 0 ] != 0 or args[ 1 ] != 0):
-            self.text_dir_x = args[ 0 ]
-            self.text_dir_y = args[ 1 ]
-            self.text_dir_rel = False
-            self.compute_text_vars()
-            self.text_cr_point = self.pen.dup()
+            self.text_drawing = False
+            self.compute_text_dir()
+        elif len(args) == 2:
+            if MIN_DEC <= args[ 0 ] <= MAX_DEC and \
+               MIN_DEC <= args[ 1 ] <= MAX_DEC and (args[ 0 ] != 0 or args[ 1 ] != 0):
+                self.text_dir = Point(args[ 0 ], args[ 1 ])
+                self.text_dir_rel = False
+                self.text_drawing = False
+                self.compute_text_dir()
+            else:
+                raise InvalidArg()
         else:
-            raise InvalidArg()
-        return None
+            raise WrongNumArgs()
 
     # DR: Set relative direction
     # 0 or 2 dec parameters
     def cmd_DR(self , args):
         args = self.get_args(args , ParsedFixArg , 0 , 2)
         if not args:
-            self.text_dir_x = 1.0
-            self.text_dir_y = 0.0
+            self.text_dir = Point(1.0, 0.0)
             self.text_dir_rel = True
-            self.compute_text_vars()
-            self.text_cr_point = self.pen.dup()
-        elif len(args) == 2 and MIN_DEC <= args[ 0 ] <= MAX_DEC and \
-          MIN_DEC <= args[ 1 ] <= MAX_DEC and (args[ 0 ] != 0 or args[ 1 ] != 0):
-            self.text_dir_x = args[ 0 ]
-            self.text_dir_y = args[ 1 ]
-            self.text_dir_rel = True
-            self.compute_text_vars()
-            self.text_cr_point = self.pen.dup()
+            self.text_drawing = False
+            self.compute_text_dir()
+        elif len(args) == 2:
+            if MIN_DEC <= args[ 0 ] <= MAX_DEC and \
+               MIN_DEC <= args[ 1 ] <= MAX_DEC and (args[ 0 ] != 0 or args[ 1 ] != 0):
+                self.text_dir = Point(args[ 0 ], args[ 1 ])
+                self.text_dir_rel = True
+                self.text_drawing = False
+                self.compute_text_dir()
+            else:
+                raise InvalidArg()
         else:
-            raise InvalidArg()
-        return None
+            raise WrongNumArgs()
 
     # IM: Set input mask
     # 0 to 3 int parameters
     def cmd_IM(self , args):
         args = self.get_args(args , ParsedIntArg , 0 , 3)
         if not args:
-            self.set_in_masks = (223 , 0 , 0)
+            self.set_in_masks = [223, 0, 0]
         else:
-            im = list(self.set_in_masks)
             for i , m in enumerate(args):
                 if not 0 <= m <= 255:
                     raise InvalidArg()
-                im[ i ] = m
-            self.set_in_masks = tuple(im)
-        self.update_status(self.status)
-        return None
+                self.set_in_masks[ i ] = m
 
     # IN: Initialize
     # No parameters
     def cmd_IN(self , args):
         self.check_no_arg(args)
         self.initialize()
-        return None
 
     # IP: Input P1/P2 points
     # 0 or 4 int parameters
@@ -1045,22 +1172,22 @@ class Plotter:
         if not args:
             self.P1 = Point(DEF_X_P1 , DEF_Y_P1)
             self.P2 = Point(DEF_X_P2 , DEF_Y_P2)
-            self.compute_text_vars()
         else:
-            llx , lly , urx , ury = self.get_args(args , ParsedIntArg , 4 , 4)
-            if MIN_X_PHY <= llx <= MAX_X_PHY and \
-                MIN_X_PHY <= urx <= MAX_X_PHY and \
-                MIN_Y_PHY <= lly <= MAX_Y_PHY and \
-                MIN_Y_PHY <= ury <= MAX_Y_PHY and \
-                llx != urx and lly != ury:
-                self.P1 = Point(min(llx , urx) , min(lly , ury))
-                self.P2 = Point(max(llx , urx) , max(lly , ury))
-                self.compute_text_vars()
+            p1x , p1y , p2x , p2y = self.get_args(args , ParsedIntArg , 4 , 4)
+            if MIN_X_PHY <= p1x <= MAX_X_PHY and \
+                MIN_X_PHY <= p2x <= MAX_X_PHY and \
+                MIN_Y_PHY <= p1y <= MAX_Y_PHY and \
+                MIN_Y_PHY <= p2y <= MAX_Y_PHY:
+                self.P1 = Point(p1x, p1y)
+                self.P2 = Point(p2x, p2y)
             else:
                 raise InvalidArg()
         self.set_status_1(0x02)
-        self.scale_factors()
-        return None
+        self.update_text_size()
+        self.compute_text_dir()
+        if self.scaling is not None:
+            self.update_pen_zone_and_up()
+            self.inverse_scale_and_update()
 
     # IW: Set window
     # 0 or 4 int parameters
@@ -1068,67 +1195,69 @@ class Plotter:
         if not args:
             self.window = Rectangle(Point(MIN_X_PHY , MIN_Y_PHY) , Point(MAX_X_PHY , MAX_Y_PHY))
         else:
-            llx , lly , urx , ury = self.get_args(args , ParsedIntArg , 4 , 4)
-            if abs(llx) > ABS_MAX_INT or abs(lly) > ABS_MAX_INT or abs(urx) > ABS_MAX_INT or abs(ury) > ABS_MAX_INT:
+            xmin, ymin, xmax, ymax = self.get_args(args , ParsedIntArg , 4 , 4)
+            xmin = max(xmin, 0) & 0xfffe
+            ymin = max(ymin, 0) & 0xfffe
+            xmax = min(xmax, MAX_X_PHY)
+            ymax = min(ymax, MAX_Y_PHY)
+            if xmin > xmax or ymin > ymax:
                 raise InvalidArg()
-            llx = min(max(MIN_X_PHY , llx) , MAX_X_PHY)
-            urx = min(max(MIN_X_PHY , urx) , MAX_X_PHY)
-            lly = min(max(MIN_Y_PHY , lly) , MAX_Y_PHY)
-            ury = min(max(MIN_Y_PHY , ury) , MAX_Y_PHY)
-            if llx >= urx or lly >= ury:
-                raise InvalidArg()
-            self.window = Rectangle(Point(llx , lly) , Point(urx , ury))
+            self.window = Rectangle(Point(xmin , ymin) , Point(xmax , ymax))
         self.update_pen_zone()
-        return None
+        if self.pen_zone == self.P_NEARBY:
+            self.set_pen_down(False)
 
     # LB: Label
     # 1 string parameter
     def cmd_LB(self , args):
-        if self.pen_zone == self.P_FARAWAY:
-            return None
         s = args[ 0 ].value
-        invalid_chars = False
-        for c in s:
-            ordc = ord(c)
-            # NOP codes: BEL, HT, FF, DCx
-            if ordc == 0x07 or ordc == 0x09 or ordc == 0x0c or 0x11 <= ordc <= 0x14:
-                pass
-            # BS
-            elif ordc == 0x08:
-                self.pen = self.char_grid_to_pt(self.pen , -6 , 0)
-            # LF
-            elif ordc == 0x0a:
-                self.text_cr_point.x += self.text_line_dx
-                self.text_cr_point.y += self.text_line_dy
-                self.pen.x += self.text_line_dx
-                self.pen.y += self.text_line_dy
-            # VT
-            elif ordc == 0x0b:
-                self.text_cr_point.x -= self.text_line_dx
-                self.text_cr_point.y -= self.text_line_dy
-                self.pen.x -= self.text_line_dx
-                self.pen.y -= self.text_line_dy
-            # CR
-            elif ordc == 0x0d:
-                self.pen = self.text_cr_point.dup()
-            # SO
-            elif ordc == 0x0e:
-                self.text_cur_set = 1
-            # SI
-            elif ordc == 0x0f:
-                self.text_cur_set = 0
-            elif 0x20 <= ordc <= 0x7e:
-                charset = self.text_sets[ self.text_cur_set ]
-                if self.font.has_auto_backspace(charset , ordc):
-                    self.pen = self.char_grid_to_pt(self.pen , -6 , 0)
-                self.draw_char(self.pen , charset , ordc)
-                self.pen = self.char_grid_to_pt(self.pen , 6 , 0)
-            else:
-                invalid_chars = True
-        self.adjust_pen_after_char()
-        if invalid_chars:
-            raise InvalidChar()
-        return None
+        if len(s) > 0:
+            self.start_text_drawing()
+            for c in s:
+                ordc = ord(c)
+                if ordc >= 0x21:
+                    code = self.font.translate_code(self.text_sets[ self.text_cur_set ], ordc)
+                    if code is None:
+                        self.set_error(4)
+                    else:
+                        self.pos_in_cell = Point(0, 0)
+                        glyph = self.font.get_glyph(code)
+                        self.draw_char(glyph)
+                        if not glyph[ 1 ]:
+                            # no auto-backspace
+                            self.move_char_offset_x(1)
+                        self.set_pen_down(False)
+                elif ordc == 0x20:
+                    # Space
+                    self.move_to_next_char()
+                elif 0x11 <= ordc <= 0x14 or ordc == 0x0c or ordc == 0x09 or ordc == 0x07:
+                    # DC1..DC4 (11..14), FF (0c), HT (09), BEL (07) = NOP
+                    pass
+                elif ordc == 0x0f:
+                    # SI (0f) = Select std charset
+                    self.text_cur_set = 0
+                elif ordc == 0x0e:
+                    # SO (0e) = Select alt charset
+                    self.text_cur_set = 1
+                elif ordc == 0x0d:
+                    # CR (0d) = carriage return
+                    self.carriage_return()
+                elif ordc == 0x0b:
+                    # VT (0b) = Move 1 line up
+                    self.move_char_offset_y_and_draw(1)
+                elif ordc == 0x0a:
+                    # LF (0a) = Move 1 line down
+                    self.move_char_offset_y_and_draw(-1)
+                elif ordc == 0x08:
+                    # BS (08) = backspace
+                    self.move_char_offset_x(-1)
+                    self.zero_pos_in_cell_and_draw(False)
+                else:
+                    self.set_error(4)
+            self.zero_pos_in_cell_and_draw(False)
+            self.set_pen_down(self.cmd_pen_down)
+        if self.scaling is not None:
+            self.inverse_scale_and_update()
 
     # LT: Set line type
     # 0 to 2 dec parameters
@@ -1137,31 +1266,33 @@ class Plotter:
         if args:
             if args[ 0 ] < 0 or args[ 0 ] >= 7:
                 raise InvalidArg()
-            if len(args) == 2 and (args[ 1 ] <= 0 or args[ 1 ] > MAX_DEC):
-                raise InvalidArg()
             self.line_type = int(args[ 0 ])
-            self.line_type_pct = 4 if len(args) < 2 else args[ 1 ]
-            self.line_pat_idx = 0
-            self.line_pat_used = 0
+            if len(args) == 2:
+                if args[ 1 ] <= 0 or args[ 1 ] > MAX_DEC:
+                    raise InvalidArg()
+                self.line_type_pct = args[ 1 ]
+            self.line_pat_idx = -1
+            self.line_pat_rem = 0
         else:
             self.line_type = self.LT_SOLID
-            self.line_type_pct = 4
-        return None
+            self.set_pen_down(self.cmd_pen_down)
 
     # OA: Output actual position
     # No parameters
     def cmd_OA(self , args):
         self.check_no_arg(args)
-        return "{},{},{}\r\n".format(int(self.last_pen.x) , int(self.last_pen.y) , int(self.pen_down))
+        return f"{int(self.pen.x)},{int(self.pen.y)},{int(self.pen_down)}\r\n"
 
     # OC: Output commanded position
     # No parameters
     def cmd_OC(self , args):
         self.check_no_arg(args)
-        if self.pen_zone == self.P_FARAWAY:
-            return "{},{},0\r\n".format(MAX_INT_NO_SC , MAX_INT_NO_SC)
+        if self.scaling is None:
+            return f"{int(self.last_pen.x)},{int(self.last_pen.y)},{int(self.cmd_pen_down)}\r\n"
+        elif self.pen_zone == self.P_FARAWAY:
+            return f"{MAX_INT_NO_SC},{MAX_INT_NO_SC},{int(self.cmd_pen_down)}\r\n"
         else:
-            return "{},{},{}\r\n".format(int(self.last_cmd_pen.x) , int(self.last_cmd_pen.y) , int(self.pen_down))
+            return f"{int(self.scaled_pen.x)},{int(self.scaled_pen.y)},{int(self.cmd_pen_down)}\r\n"
 
     # OE: Output error
     # No parameters
@@ -1169,7 +1300,7 @@ class Plotter:
         self.check_no_arg(args)
         save = self.err_no
         self.set_error(0)
-        return "{}\r\n".format(save)
+        return f"{save}\r\n"
 
     # OF: Output factors
     # No parameters
@@ -1193,87 +1324,130 @@ class Plotter:
     # No parameters
     def cmd_OP(self , args):
         self.check_no_arg(args)
-        return "{},{},{},{}\r\n".format(self.P1.x , self.P1.y , self.P2.x , self.P2.y)
+        p2 = deepcopy(self.P2)
+        if p2.x == self.P1.x:
+            p2.x += 1
+        if p2.y == self.P1.y:
+            p2.y += 1
+        self.set_status_0(2)
+        return f"{self.P1.x},{self.P1.y},{p2.x},{p2.y}\r\n"
 
     # OS: Output status
     # No parameters
     def cmd_OS(self , args):
         self.check_no_arg(args)
-        save = self.status & 0xbf
-        if self.srq_pending:
-            save |= 0x40
+        save = self.status
         self.set_status_0(8)
-        return "{}\r\n".format(save)
+        return f"{save}\r\n"
+
+    def scale_coord(self, coord_m_min, in_range, out_range):
+        if in_range == 0:
+            raise PosOverflow()
+        return round((out_range * coord_m_min) / in_range)
+
+    def plot(self, args, absolute):
+        points = self.get_args(args , ParsedIntArg , 0 , None)
+        for px , py in group_pairs(points):
+            self.text_drawing = False
+            if py == None:
+                # odd number of parameters
+                raise WrongNumArgs()
+            dest = None
+            if abs(px) <= MAX_INT_NO_SC and abs(py) <= MAX_INT_NO_SC:
+                if self.scaling is None:
+                    if absolute:
+                        dest = Point(px, py)
+                    else:
+                        px += self.last_pen.x
+                        py += self.last_pen.y
+                        if MIN_INT_NO_SC <= px <= MAX_INT_NO_SC and\
+                           MIN_INT_NO_SC <= py <= MAX_INT_NO_SC:
+                            dest = Point(px, py)
+                else:
+                    try:
+                        self.check_scaled_coord(px)
+                        self.check_scaled_coord(py)
+                        if not absolute:
+                            px += self.scaled_pen.x
+                            self.check_scaled_coord(px)
+                            py += self.scaled_pen.y
+                            self.check_scaled_coord(py)
+                        max_m_min_x = self.scaling.pur.x - self.scaling.pll.x
+                        p2p1_diff_x = self.P2.x - self.P1.x
+                        if p2p1_diff_x >= 0:
+                            x = self.P1.x + self.scale_coord(px - self.scaling.pll.x, max_m_min_x, p2p1_diff_x)
+                        else:
+                            x = self.P2.x + self.scale_coord(px - self.scaling.pur.x, max_m_min_x, p2p1_diff_x)
+                        self.check_scaled_coord(x)
+                        max_m_min_y = self.scaling.pur.y - self.scaling.pll.y
+                        p2p1_diff_y = self.P2.y - self.P1.y
+                        if p2p1_diff_y >= 0:
+                            y = self.P1.y + self.scale_coord(py - self.scaling.pll.y, max_m_min_y, p2p1_diff_y)
+                        else:
+                            y = self.P2.y + self.scale_coord(py - self.scaling.pur.y, max_m_min_y, p2p1_diff_y)
+                        self.check_scaled_coord(y)
+                        dest = Point(x, y)
+                        self.scaled_pen = Point(px, py)
+                    except PosOverflow:
+                        # dest is already None
+                        pass
+            if dest is not None:
+                if self.pen_zone != self.P_FARAWAY:
+                    self.draw_pattern_line_sym(dest)
+                else:
+                    self.draw_to_point(dest, False)
+            else:
+                self.set_pen_zone(self.P_FARAWAY)
 
     # PA: Plot absolute
     # 0 to n int parameters
     def cmd_PA(self , args):
-        points = self.get_args(args , ParsedIntArg , 0 , None)
-        for px , py in group_pairs(points):
-            if py == None:
-                # odd number of parameters
-                raise WrongNumArgs()
-            pt = Point(px , py)
-            z , psc = self.get_pt_zone(pt)
-            if self.pen_zone == self.P_FARAWAY:
-                if z != self.P_FARAWAY:
-                    self.pen = psc
-                    if z == self.P_IN_WINDOW:
-                        self.last_pen = psc
-            elif z == self.P_IN_WINDOW or z == self.P_NEARBY:
-                s = Segment(self.pen , psc)
-                self.draw_clipped_segment(s)
-                self.pen = psc
-            self.set_pen_zone(z)
-        self.text_cr_point = self.pen.dup()
-        return None
+        self.plot(args, True)
 
     # PD: Pen down
     # No parameters
     def cmd_PD(self , args):
         self.check_no_arg(args)
-        if self.pen_zone != self.P_FARAWAY:
-            self.set_pen_down(True)
-        return None
+        if not self.cmd_pen_down:
+            self.cmd_pen_down = True
+            self.set_status_1(0x01)
+            if self.pen_zone == self.P_IN_WINDOW:
+                self.set_pen_down(True)
 
     # PR: Plot relative
     # 0 to n int parameters
     def cmd_PR(self , args):
-        points = self.get_args(args , ParsedIntArg , 0 , None)
-        for px , py in group_pairs(points):
-            if py == None:
-                # odd number of parameters
-                raise WrongNumArgs()
-            pt = Point(px , py)
-            if self.pen_zone != self.P_FARAWAY:
-                z , psc = self.get_pt_zone(pt , True)
-                if z == self.P_IN_WINDOW or z == self.P_NEARBY:
-                    s = Segment(self.pen , psc)
-                    self.draw_clipped_segment(s)
-                    self.pen = psc
-                self.set_pen_zone(z)
-        self.text_cr_point = self.pen.dup()
-        return None
+        if self.pen_zone == self.P_FARAWAY:
+            return
+        self.plot(args, False)
+
+    def cmd_pen_up(self):
+        # 02ee
+        self.cmd_pen_down = False
+        self.set_status_0(0x01)
+        if self.pen_zone != self.P_FARAWAY:
+            self.set_pen_down(False)
 
     # PU: Pen up
     # No parameters
     def cmd_PU(self , args):
         self.check_no_arg(args)
-        self.set_pen_down(False)
-        return None
+        if self.cmd_pen_down:
+            self.cmd_pen_up()
 
     # SA: Select alternate set
     # No parameters
     def cmd_SA(self , args):
         self.check_no_arg(args)
         self.text_cur_set = 1
-        return None
 
     # SC: Scale
     # 0 or 4 int parameters
     def cmd_SC(self , args):
         if not args:
-            self.scaling = None
+            if self.scaling is not None:
+                self.scaling = None
+                self.update_pen_zone_and_up()
         else:
             xmin , xmax , ymin , ymax = self.get_args(args , ParsedIntArg , 4 , 4)
             if MIN_INT_SC <= xmin <= MAX_INT_SC and \
@@ -1282,10 +1456,10 @@ class Plotter:
               MIN_INT_SC <= ymax <= MAX_INT_SC and \
               xmin < xmax and ymin < ymax:
                 self.scaling = Rectangle(Point(xmin , ymin) , Point(xmax , ymax))
-                self.scale_factors()
+                self.update_pen_zone_and_up()
+                self.inverse_scale_and_update()
             else:
                 raise InvalidArg()
-        return None
 
     # SI: Set absolute character size
     # 0 or 2 dec parameters
@@ -1293,17 +1467,17 @@ class Plotter:
         args = self.get_args(args , ParsedFixArg , 0 , 2)
         if not args:
             self.text_size_rel = False
-            self.text_size_x = 114
-            self.text_size_y = 150
-            self.compute_text_vars()
-        elif len(args) == 2 and 0 < args[ 0 ] <= MAX_DEC and 0 < args[ 1 ] <= MAX_DEC:
-            self.text_size_rel = False
-            self.text_size_x = args[ 0 ] * 400
-            self.text_size_y = args[ 1 ] * 400
-            self.compute_text_vars()
+            self.text_size = Point(114, 150)
+            self.update_text_size()
+        elif len(args) == 2:
+            if 0 < args[ 0 ] < (10485 / 256) and 0 < args[ 1 ] < (10485 / 256):
+                self.text_size_rel = False
+                self.text_size = Point(int(args[ 0 ] * 400), int(args[ 1 ] * 400))
+                self.update_text_size()
+            else:
+                raise InvalidArg()
         else:
-            raise InvalidArg()
-        return None
+            raise WrongNumArgs()
 
     # SL: Set slant
     # 0 or 1 dec parameter
@@ -1311,28 +1485,23 @@ class Plotter:
         args = self.get_args(args , ParsedFixArg , 0 , 1)
         if not args:
             self.text_slant = 0.0
-            self.compute_text_vars()
         elif MIN_DEC <= args[ 0 ] <= MAX_DEC:
             self.text_slant = args[ 0 ]
-            self.compute_text_vars()
         else:
             raise InvalidArg()
-        return None
 
     # SM: Symbol mode
     # 0 or 1 single-character string
     def cmd_SM(self , args):
-        args = self.get_args(args , ParsedString , 1 , 1)
-        if not args[ 0 ]:
-            self.text_symbol = None
+        self.text_symbol = None
+        if not args:
+            return
+        elif isinstance(args[ 0 ], InvalidArg):
+            raise WrongNumArgs()
         else:
-            ordc = ord(args[ 0 ])
-            if 0x21 <= ordc <= 0x7e:
-                self.text_symbol = ordc
-                self.text_symbol_charset = self.text_sets[ self.text_cur_set ]
-            else:
-                raise InvalidChar()
-        return None
+            self.text_symbol = self.font.translate_code(self.text_sets[ self.text_cur_set ], ord(args[ 0 ].value))
+            if self.text_symbol is None:
+                raise InvalidArg()
 
     # SP: Select pen
     # 0 or 1 int parameter
@@ -1342,11 +1511,8 @@ class Plotter:
             pen_no = args[ 0 ]
             if 0 <= pen_no <= 8:
                 self.pen_no = pen_no
-            else:
-                raise InvalidArg()
         else:
             self.pen_no = 0
-        return None
 
     # SR: Set relative character size
     # 0 or 2 dec parameters
@@ -1354,24 +1520,23 @@ class Plotter:
         args = self.get_args(args , ParsedFixArg , 0 , 2)
         if not args:
             self.text_size_rel = True
-            self.text_size_x = 0.0075
-            self.text_size_y = 0.015
-            self.compute_text_vars()
-        elif len(args) == 2 and 0 < args[ 0 ] <= MAX_DEC and 0 < args[ 1 ] <= MAX_DEC:
-            self.text_size_rel = True
-            self.text_size_x = args[ 0 ] / 100
-            self.text_size_y = args[ 1 ] / 100
-            self.compute_text_vars()
+            self.text_size = Point(0.0075, 0.015)
+            self.update_text_size()
+        elif len(args) == 2:
+            if 0 < args[ 0 ] <= MAX_DEC and 0 < args[ 1 ] <= MAX_DEC:
+                self.text_size_rel = True
+                self.text_size = Point(args[ 0 ] / 100, args[ 1 ] / 100)
+                self.update_text_size()
+            else:
+                raise InvalidArg()
         else:
-            raise InvalidArg()
-        return None
+            raise WrongNumArgs()
 
     # SS: Select standard set
     # No parameters
     def cmd_SS(self , args):
         self.check_no_arg(args)
         self.text_cur_set = 0
-        return None
 
     # TL: Set tick length
     # 0 to 2 dec parameters
@@ -1389,70 +1554,60 @@ class Plotter:
             self.neg_tick = args[ 1 ] / 100.0
         else:
             raise InvalidArg()
-        return None
 
     # UC: Defined user character
     # 0 to n int parameters
     def cmd_UC(self , args):
-        points = self.get_args(args , ParsedIntArg , 0 , None)
-        if self.pen_zone != self.P_FARAWAY:
-            i = iter(points)
-            draw = False
-            prev_pt = self.pen.dup()
-            x = 0
-            y = 0
-            for dx in i:
-                if dx == -99:
-                    draw = False
-                elif dx == 99:
-                    draw = True
-                elif -98 <= dx <= 98:
-                    try:
-                        dy = next(i)
-                    except StopIteration:
-                        raise InvalidArg()
-                    if -98 <= dy <= 98:
-                        x += dx
-                        y += dy
-                        next_pt = self.char_grid_to_pt(self.pen , x , y)
-                        if draw and self.pen_no != 0:
-                            self.draw_always_clipped_segment(Segment(prev_pt , next_pt))
-                        prev_pt = next_pt
+        try:
+            self.start_text_drawing()
+            points = self.get_args(args , ParsedIntArg , 0 , None)
+            if not points:
+                self.carriage_return()
+            else:
+                self.zero_pos_in_cell_and_draw(False)
+                pen = False
+                it = iter(points)
+                while (pt := next(it, None)) is not None:
+                    if pt >= 99:
+                        pen = True
+                    elif pt <= -99:
+                        pen = False
                     else:
-                        raise InvalidArg()
-                else:
-                    raise InvalidArg()
-            self.pen = self.char_grid_to_pt(self.pen , 6 , 0)
-            self.adjust_pen_after_char()
-        return None
+                        tmp = pt
+                        pt = next(it, None)
+                        if pt is None:
+                            raise WrongNumArgs()
+                        elif abs(pt) > 98:
+                            raise InvalidArg()
+                        else:
+                            self.pos_in_cell.x += tmp * 16
+                            self.pos_in_cell.y += pt * 8
+                            self.draw_to_point_char(pen)
+                self.move_to_next_char()
+        finally:
+            if self.scaling is not None:
+                self.inverse_scale_and_update()
+
+    def draw_tick(self, off):
+        save = deepcopy(self.last_pen)
+        self.draw_to_point(off + self.last_pen, True)
+        self.draw_to_point(save, True)
 
     # XT: Draw X ticks
     # No parameters
     def cmd_XT(self , args):
         self.check_no_arg(args)
-        if self.pen_zone != self.P_FARAWAY and self.pen_no != 0:
-            p1 = self.pen.dup()
-            p2 = self.pen.dup()
-            save_last_pen = self.last_pen
-            p1.y -= self.neg_tick * abs(self.P2.y - self.P1.y)
-            p2.y += self.pos_tick * abs(self.P2.y - self.P1.y)
-            self.draw_always_clipped_segment(Segment(p1 , p2))
-            self.last_pen = save_last_pen
-        return None
+        if self.pen_zone != self.P_FARAWAY:
+            self.draw_tick(Point(0, self.pos_tick * abs(self.P2.y - self.P1.y)))
+            self.draw_tick(Point(0, -self.neg_tick * abs(self.P2.y - self.P1.y)))
 
     # YT: Draw Y ticks
     # No parameters
     def cmd_YT(self , args):
         self.check_no_arg(args)
-        if self.pen_zone != self.P_FARAWAY and self.pen_no != 0:
-            p1 = self.pen.dup()
-            p2 = self.pen.dup()
-            save_last_pen = self.last_pen
-            p1.x -= self.neg_tick * abs(self.P2.x - self.P1.x)
-            p2.x += self.pos_tick * abs(self.P2.x - self.P1.x)
-            self.draw_always_clipped_segment(Segment(p1 , p2))
-            self.last_pen = save_last_pen
-        return None
+        if self.pen_zone != self.P_FARAWAY:
+            self.draw_tick(Point(self.pos_tick * abs(self.P2.x - self.P1.x), 0))
+            self.draw_tick(Point(-self.neg_tick * abs(self.P2.x - self.P1.x), 0))
 
     def ev_dev_clear(self , ev):
         #TODO:
@@ -1461,50 +1616,46 @@ class Plotter:
 
     def ev_listen_data(self , ev):
         # Listen data
-        s = str(ev.data , encoding = "ascii" , errors = "replace")
+        # EOI signal is ignored when receiving data
+        # Bit 7 is masked out of each byte
+        s = str(bytes([x & 0x7f for x in ev.data]) , encoding = "ascii" , errors = "replace")
         for p in self.parser.parse(s):
-            if isinstance(p , ParsedCmd):
-                cmd_fn = "cmd_" + p.cmd
-                d = self.__class__.__dict__
-                cmd_m = d.get(cmd_fn)
-                if cmd_m:
-                    try:
-                        res = cmd_m(self , p.args)
-                        if res:
-                            self.output = res.encode("ascii" , "ignore")
-                    except WrongNumArgs:
-                        # Wrong number of parameters
-                        self.set_error(2)
-                    except InvalidArg:
-                        # Bad parameter
-                        self.set_error(3)
-                    except InvalidChar:
-                        # Illegal character
-                        self.set_error(4)
-                    except PosOverflow:
-                        # Position overflow
-                        self.set_error(6)
-                else:
-                    # Unknown command
-                    self.set_error(1)
+            cmd_fn = "cmd_" + p.cmd
+            d = self.__class__.__dict__
+            cmd_m = d.get(cmd_fn)
+            if cmd_m:
+                try:
+                    res = cmd_m(self , p.args)
+                    if res:
+                        self.output = res.encode("ascii" , "ignore")
+                except WrongNumArgs:
+                    # Wrong number of parameters
+                    self.set_error(2)
+                except InvalidArg:
+                    # Bad parameter
+                    self.set_error(3)
+                except InvalidChar:
+                    # Illegal character
+                    self.set_error(4)
+                except UnknownCharSet:
+                    # Unknown character set
+                    self.set_error(5)
+                except PosOverflow:
+                    # Position overflow
+                    self.set_error(6)
             else:
-                # Parse error
-                self.set_error(4)
+                # Unknown command
+                self.set_error(1)
 
     def ev_talk(self , ev):
         if self.output:
             self.io.set_talk_data(self.output)
             self.output = None
 
-    def ev_serial_poll(self , ev):
-        self.io.set_rsv_state(False)
-        self.srq_pending = False
-
     EV_FNS = {
         rem488.RemotizerDevClear  : ev_dev_clear,
         rem488.RemotizerData      : ev_listen_data,
-        rem488.RemotizerTalk      : ev_talk,
-        rem488.RemotizerSerialPoll: ev_serial_poll
+        rem488.RemotizerTalk      : ev_talk
         }
 
     def io_event(self , ev):
