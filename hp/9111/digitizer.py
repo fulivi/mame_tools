@@ -22,7 +22,7 @@ import re
 import sys
 import threading
 import struct
-from PyQt5 import QtCore
+from PyQt6 import QtCore
 
 class ParseError:
     def __init__(self , s):
@@ -796,7 +796,7 @@ class DigitizerIO(QtCore.QThread):
                         self.digitizer.ev_dispatch(ev)
             if run_evd:
                 il = 0
-                evd.processEvents(QtCore.QEventLoop.AllEvents)
+                evd.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents)
 
     def pen_position(self , x , y , press):
         self.digitizer.pen_position(x , y , press)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A HP9111 emulator for use with MAME IEEE-488 remotizer
-# Copyright (C) 2020 F. Ulivi <fulivi at big "G" mail>
+# Copyright (C) 2020-2023 F. Ulivi <fulivi at big "G" mail>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,7 +17,8 @@
 # <http://www.gnu.org/licenses/>.
 
 import sys
-from PyQt5 import QtCore, QtGui, QtWidgets, QtMultimedia
+sys.path.append("../hp_disk/")
+from PyQt6 import QtCore, QtGui, QtWidgets, QtMultimedia
 import resources
 import digitizer
 import rem488
@@ -50,10 +51,10 @@ class Plate(QtWidgets.QWidget):
         names = list(backgrounds.keys())
         names.sort()
         self.bg_action_names = {}
-        self.bg_ag = QtWidgets.QActionGroup(self.menu)
+        self.bg_ag = QtGui.QActionGroup(self.menu)
         self.bg_ag.setExclusive(True)
         for n in names:
-            a = QtWidgets.QAction(n , self.menu)
+            a = QtGui.QAction(n , self.menu)
             self.bg_action_names[ a ] = n
             a.setCheckable(True)
             self.bg_ag.addAction(a)
@@ -107,20 +108,20 @@ class Plate(QtWidgets.QWidget):
             self.pen_position.emit(du.x() , du.y() , press)
 
     def mousePressEvent(self , event):
-        if event.button() == QtCore.Qt.LeftButton:
-            du = self.point_to_du(event.pos())
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            du = self.point_to_du(event.position().toPoint())
             self.emit_pen_state(du , True)
             super().mousePressEvent(event)
-        elif event.button() == QtCore.Qt.RightButton:
-            self.menu.popup(self.mapToGlobal(event.pos()))
+        elif event.button() == QtCore.Qt.MouseButton.RightButton:
+            self.menu.popup(self.mapToGlobal(event.position()).toPoint())
 
     def mouseReleaseEvent(self , event):
-        if event.button() == QtCore.Qt.LeftButton:
-            du = self.point_to_du(event.pos())
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            du = self.point_to_du(event.position().toPoint())
             self.emit_pen_state(du , False)
 
     def enterEvent(self , event):
-        du = self.point_to_du(event.pos())
+        du = self.point_to_du(event.position().toPoint())
         self.emit_pen_state(du , False)
 
     def leaveEvent(self , event):
@@ -129,8 +130,8 @@ class Plate(QtWidgets.QWidget):
             self.pen_proximity.emit(False)
 
     def mouseMoveEvent(self , event):
-        du = self.point_to_du(event.pos())
-        self.emit_pen_state(du , event.buttons() & QtCore.Qt.LeftButton)
+        du = self.point_to_du(event.position().toPoint())
+        self.emit_pen_state(du , event.buttons() == QtCore.Qt.MouseButton.LeftButton)
 
     def sizeHint(self):
         return self.image.size()
@@ -298,23 +299,16 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.statusbar.addPermanentWidget(self.label_error)
         self.statusbar.addPermanentWidget(self.led_error)
         self.conn_msg = ""
-        self.adi = QtMultimedia.QAudioDeviceInfo.defaultOutputDevice()
         self.tmr = QtCore.QTimer(self)
         self.tmr.timeout.connect(self.push_audio)
         af = QtMultimedia.QAudioFormat()
-        af.setByteOrder(QtMultimedia.QAudioFormat.LittleEndian)
         af.setChannelCount(1)
-        af.setCodec("audio/pcm")
         af.setSampleRate(11025)
-        af.setSampleSize(16)
-        af.setSampleType(QtMultimedia.QAudioFormat.SignedInt)
+        af.setSampleFormat(QtMultimedia.QAudioFormat.SampleFormat.Int16)
         self.audio_lock = threading.RLock()
         self.audio_running = False
-        self.out = QtMultimedia.QAudioOutput(self.adi , af , self)
+        self.out = QtMultimedia.QAudioSink(af , self)
         self.out.stateChanged.connect(self.stateChanged)
-        # 40 ms of audio buffer
-        self.out.setBufferSize(round(11025.0 * 0.04 * 2))
-        self.audio_io = self.out.start()
 
     def closeEvent(self , event):
         self.save_settings()
@@ -325,37 +319,29 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
     def stateChanged(self , s):
         with self.audio_lock:
-            if s == QtMultimedia.QAudio.IdleState and self.audio_running and self.samples == 0:
+            if s == QtMultimedia.QAudio.State.IdleState and self.audio_running and self.samples == 0:
                 self.audio_running = False
                 self.tmr.stop()
 
     def push_audio(self):
-        if self.out == QtMultimedia.QAudio.StoppedState:
+        if self.out == QtMultimedia.QAudio.State.StoppedState:
             return
         if not self.audio_running:
             return
 
-        chunks = self.out.bytesFree() // self.out.periodSize()
-        if not chunks:
-            return
-        if self.samples > 0:
-            b = bytearray()
-            for i in range(chunks):
-                chunk_samples = self.out.periodSize() // 2
-                while chunk_samples > 0:
-                    with self.audio_lock:
-                        if self.samples:
-                            n_samples = min(self.samples , chunk_samples)
-                            b.extend(self.get_samples(n_samples))
-                            self.samples -= n_samples
-                            chunk_samples -= n_samples
-                            if not self.samples:
-                                self.note_ended.emit()
-                        else:
-                            # Pad rest of chunk with silence
-                            b.extend(bytes(chunk_samples * 2))
-                            chunk_samples = 0
-            self.audio_io.write(b)
+        free_samples = self.out.bytesFree() // 2
+        while free_samples > 0:
+            with self.audio_lock:
+                n_samples = min(self.samples , free_samples)
+                if n_samples > 0:
+                    s = self.get_samples(n_samples)
+                    self.audio_io.write(s)
+                    self.samples -= n_samples
+                    free_samples -= n_samples
+                    if not self.samples:
+                        self.note_ended.emit()
+                else:
+                    break
 
     # SLOT
     def conn_status(self , status , msg):
@@ -386,22 +372,25 @@ class MyMainWindow(QtWidgets.QMainWindow):
     def play_note(self , note , duration , amplitude):
         freq = (2 ** (note / 12.0)) * 130.81
         with self.audio_lock:
-            self.two_om = 2.0 * math.pi * freq / 11025.0
+            self.two_om = math.tau * freq / 11025.0
             self.peak = self.AMPS[ amplitude ]
             self.samples = round(duration * 11.025)
             if not self.audio_running:
-                self.audio_running = True
                 self.ph = 0
+                # 40 ms of audio
+                self.out.setBufferSize(round(11025.0 * 0.04 * 2))
+                self.audio_io = self.out.start()
+                self.audio_running = True
                 self.tmr.start(10)
 
     def get_samples(self , count):
-        b = bytearray()
-        for n in range(count):
+        b = bytearray(count * 2)
+        for n in range(0, count * 2, 2):
             s = round(self.peak * math.sin(self.ph))
-            b.extend(struct.pack("<h" , s))
+            b[ n:(n + 2) ] = struct.pack("h" , s)
             self.ph += self.two_om
-            if self.ph >= 2.0 * math.pi:
-                self.ph -= 2.0 * math.pi
+            if self.ph >= math.tau:
+                self.ph -= math.tau
         return b
 
     def load_backgrounds(self):
@@ -459,7 +448,7 @@ def get_tcp_port(app):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("HP9111 emulator")
-    app.setApplicationVersion("1.0")
+    app.setApplicationVersion("1.1")
     port = get_tcp_port(app)
     digitizer = digitizer.DigitizerIO(port)
     myapp = MyMainWindow()
@@ -473,4 +462,4 @@ if __name__ == '__main__':
     myapp.load_backgrounds()
     myapp.load_settings()
     myapp.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

@@ -15,7 +15,7 @@ These files must be placed in the same directory. The emulator also needs `rem48
 
 An optional file (`backgrounds.json`) lists additional backgrounds to be loaded beside the default one. See below for a detailed description.
 
-9111 is written in Python 3. It requires the [PyQt5 library](https://www.riverbankcomputing.com/software/pyqt/download5) which can be installed with `pip install PyQt5`.
+9111 is written in Python 3. It requires the [PyQt6 library](https://www.riverbankcomputing.com/software/pyqt/download) which can be installed with `pip install PyQt6`.
 
 ## Usage
 
@@ -82,3 +82,5 @@ I'd like to thank A. Kueckes for his support, for letting me peek at the source 
 ## Change history
 
 + 1.0: first release
+
++ 1.1: ported to Qt6
