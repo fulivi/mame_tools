@@ -36,3 +36,4 @@ Mux can be exited by simply interrupting the process (usually by pressing Ctrl-C
 ## Change history
 
 + 1.0: first release
++ 1.1: PP propagation bug fixed

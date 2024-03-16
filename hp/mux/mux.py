@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A multiplexer for MAME IEEE-488 remotizer
-# Copyright (C) 2022 F. Ulivi <fulivi at big "G" mail>
+# Copyright (C) 2022-2024 F. Ulivi <fulivi at big "G" mail>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -184,6 +184,12 @@ async def align_signals(connected , signals , to_skip = None):
                 await p.send(RemotizerMsg(None , "R" , to_clear))
     return new_signals
 
+def get_global_pp(connected):
+    pp = 0
+    for r in connected:
+        pp |= r.pp
+    return pp
+
 async def main(ports):
     q_in = asyncio.Queue()
     rems = []
@@ -259,13 +265,15 @@ async def main(ports):
                     p.signals |= e.msg_data
                     signals = await align_signals(connected , signals , p)
                 elif e.msg_type == "Q":
-                    pp = 0
-                    for r in connected:
-                        if r is not p:
-                            pp |= r.pp
+                    pp = get_global_pp(connected)
                     await p.send(RemotizerMsg(None , "P" , pp))
                 elif e.msg_type == "P":
                     p.pp = e.msg_data
+                    pp = get_global_pp(connected)
+                    m = RemotizerMsg(None , "P" , pp)
+                    for r in connected:
+                        if r is not p:
+                            await r.send(m)
             else:
                 # Waiting for CP
                 if e.msg_type == "Y":
