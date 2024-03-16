@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A GUI based emulator of HP Amigo drives for use with MAME IEEE-488 remotizer
-# Copyright (C) 2020 F. Ulivi <fulivi at big "G" mail>
+# Copyright (C) 2020-2024 F. Ulivi <fulivi at big "G" mail>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,12 +18,14 @@
 
 import sys
 import os.path
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from main import Ui_MainWindow
 
 import hp_disk_protocol
 import rem488
+
+DEFAULT_PORT = 1234
 
 class MyMainWindow(QtWidgets.QMainWindow):
     N_UNITS = 2
@@ -52,6 +54,9 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.unit_cyl = self.instances_to_list("cyl")
         self.unit_head = self.instances_to_list("head")
         self.unit_sec = self.instances_to_list("sec")
+        self.unit_capacity = self.instances_to_list("capacity")
+        self.unit_geometry = self.instances_to_list("geometry")
+        self.unit_bps = self.instances_to_list("bps")
         for model in hp_disk_protocol.DRIVE_MODELS:
             self.ui.drive_model.addItem(model.name)
         self.set_connected_state(False)
@@ -59,41 +64,40 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.io.rd_counter.connect(self.inc_rd_counter)
         self.io.wr_counter.connect(self.inc_wr_counter)
         self.io.curr_pos.connect(self.set_current_pos)
-        self.io.active.connect(self.active)
+        self.act_timers = []
+        for n in range(self.N_UNITS):
+            timer = QtCore.QTimer()
+            f = (lambda n: lambda : self.act_timer_to(n))(n)
+            timer.timeout.connect(f)
+            timer.setSingleShot(True)
+            self.act_timers.append(timer)
         for n in range(self.N_UNITS):
             self.clear_status(n)
         self.io.set_address(0)
-        self.addr_timer = QtCore.QTimer()
-        self.addr_timer.timeout.connect(self.addr_timer_to)
-        self.addr_timer.setSingleShot(True)
         self.load_settings()
 
     def instances_to_list(self , suffix):
-        l = [ self.ui.__dict__[ "unit{}_{}".format(n , suffix) ] for n in range(self.N_UNITS) ]
+        l = [ self.ui.__dict__[ f"unit{n}_{suffix}" ] for n in range(self.N_UNITS) ]
         return l
 
     # SLOT
     def set_model(self , model_idx):
         model = hp_disk_protocol.DRIVE_MODELS[ model_idx ]
         self.ui.drive_protocol.setText(model.protocol)
-        g = model.geometry
-        self.ui.drive_geometry.setText("{}x{}x{}".format(g[ 0 ] , g[ 1 ] , g[ 2 ]))
-        size = model.max_lba * 256
-        self.ui.drive_capacity.setText("{} k".format((size + 1023) // 1024))
-        self.ui.unit1.setEnabled(model.units > 1)
+        self.io.set_model(model_idx)
         for n in range(self.N_UNITS):
             self.clear_status(n)
-        self.io.set_model(model_idx)
-
-    # SLOT
-    def active(self):
-        self.addr_timer.start(100)
-        self.ui.drive_active.setStyleSheet("background-color: red")
-
-    # SLOT
-    def addr_timer_to(self):
-        self.ui.drive_active.setStyleSheet("")
-        self.io.clear_active()
+            if n < len(model.unit_specs):
+                self.ui.drives.setTabEnabled(n, True)
+                geometry = self.io.drive.units[ n ].geometry
+                g = geometry.max_chs
+                bps = self.io.drive.units[ n ].bps
+                size = geometry.max_lba * bps
+                self.unit_geometry[ n ].setText(f"{g[ 0 ]}x{g[ 1 ]}x{g[ 2 ]}")
+                self.unit_capacity[ n ].setText(f"{(size + 1023) // 1024} k")
+                self.unit_bps[ n ].setText(f"{bps}")
+            else:
+                self.ui.drives.setTabEnabled(n, False)
 
     # SLOT
     def set_address(self , addr):
@@ -103,7 +107,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
     # SLOT
     def conn_status(self , status , msg):
         if status == rem488.CONNECTION_OK:
-            self.ui.statusbar.showMessage("Connected {}".format(msg))
+            self.ui.statusbar.showMessage(f"Connected {msg}")
             self.set_connected_state(True)
         elif status == rem488.CONNECTION_CLOSED:
             self.ui.statusbar.showMessage("Disconnected")
@@ -129,11 +133,11 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.io.load_image(unit , None)
             self.clear_image_file(unit)
         else:
-            f = QtWidgets.QFileDialog.getOpenFileName(self , "Select image file for unit {}".format(unit))
+            f = QtWidgets.QFileDialog.getOpenFileName(self , f"Select image file for unit {unit}")
             if f[ 0 ]:
                 status = self.load_file(unit , f[ 0 ])
                 if status != 0:
-                    QtWidgets.QMessageBox.critical(self , "Error" , "Can't open file {} (err={})".format(f[ 0 ] , status))
+                    QtWidgets.QMessageBox.critical(self , "Error" , f"Can't open file {f[ 0 ]} (err={status})")
         self.clear_counters(unit)
         self.clear_pos(unit)
 
@@ -165,13 +169,23 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
     # SLOT
     def inc_rd_counter(self , unit , delta):
-        self.rd_counter[ unit ] += delta
-        self.unit_read[ unit ].setNum(self.rd_counter[ unit ])
+        if delta > 0:
+            self.rd_counter[ unit ] += delta
+            self.unit_read[ unit ].setNum(self.rd_counter[ unit ])
+            self.ui.drives.tabBar().setTabTextColor(unit, QtCore.Qt.GlobalColor.green)
+            self.act_timers[ unit ].start(100)
 
     # SLOT
     def inc_wr_counter(self , unit , delta):
-        self.wr_counter[ unit ] += delta
-        self.unit_write[ unit ].setNum(self.wr_counter[ unit ])
+        if delta > 0:
+            self.wr_counter[ unit ] += delta
+            self.unit_write[ unit ].setNum(self.wr_counter[ unit ])
+            self.ui.drives.tabBar().setTabTextColor(unit, QtCore.Qt.GlobalColor.red)
+            self.act_timers[ unit ].start(100)
+
+    # SLOT
+    def act_timer_to(self, unit):
+        self.ui.drives.tabBar().setTabTextColor(unit, QtCore.Qt.GlobalColor.black)
 
     def clear_pos(self , unit):
         self.unit_lba[ unit ].setNum(0)
@@ -233,10 +247,29 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.save_settings()
         event.accept()
 
+def get_options(app):
+    parser = QtCore.QCommandLineParser()
+    parser.addHelpOption()
+    port_opt = QtCore.QCommandLineOption([ "p" , "port" ] , "Set TCP port fo remote488." , "TCP port" , str(DEFAULT_PORT))
+    parser.addOption(port_opt)
+    parser.process(app)
+    try:
+        port = int(parser.value(port_opt))
+    except ValueError:
+        print("Invalid port, using default")
+        port = DEFAULT_PORT
+    if not 1 <= port <= 65535:
+        print("Invalid port ({}), using default".format(port))
+        port = DEFAULT_PORT
+    return port
+
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
-    iot = hp_disk_protocol.IOThread()
+    app.setApplicationName("HP disk emulator")
+    app.setApplicationVersion("2.0")
+    port = get_options(app)
+    iot = hp_disk_protocol.IOThread(port)
     myapp = MyMainWindow(iot)
     iot.start()
     myapp.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

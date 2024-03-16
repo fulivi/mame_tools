@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A GUI based emulator of HP Amigo drives for use with MAME IEEE-488 remotizer
-# Copyright (C) 2020-2022 F. Ulivi <fulivi at big "G" mail>
+# Copyright (C) 2020-2024 F. Ulivi <fulivi at big "G" mail>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -78,10 +78,11 @@ class RemotizerDevClear(RemotizerEvent):
         return "Device Clear"
 
 class RemotizerData(RemotizerEvent):
-    def __init__(self , sec_addr , data , end):
+    def __init__(self, sec_addr, data, end, unlistened):
         self.sec_addr = sec_addr
         self.data = data
         self.end = end
+        self.unlistened = unlistened
 
     def __str__(self):
         s = "Data len={} ".format(len(self.data))
@@ -89,6 +90,8 @@ class RemotizerData(RemotizerEvent):
             s += "SA={:02x}".format(self.sec_addr)
         if self.end:
             s += " (END)"
+        if self.unlistened:
+            s += " (UNL)"
         return s
 
 class RemotizerTalk(RemotizerEvent):
@@ -170,6 +173,8 @@ class RemotizerIO:
         self.next_event = None
         self.pp_state = None
         self.accum = bytearray()
+        self.listen_data = False
+        self.listen_sa = None
         self._sr_fsm()
 
     CMDS = {
@@ -248,8 +253,15 @@ class RemotizerIO:
 
     def _flush_accum(self):
         if self.accum:
-            self._enqueue(RemotizerData(self.sec_addr , self.accum , False))
+            self._enqueue(RemotizerData(self.listen_sa, self.accum, False, False))
             self.accum = bytearray()
+
+    def _unlistened(self):
+        if self.accum or (self.listen_data and self.listen_sa in self.unlisten_sa):
+            self._enqueue(RemotizerData(self.listen_sa, self.accum, False, True))
+            self.accum = bytearray()
+            self.listen_data = False
+        self.listen_sa = None
 
     def _fsm488_D(self , msg_data):
         if (self.signals & 1) == 0:
@@ -285,28 +297,27 @@ class RemotizerIO:
                 self.spms = False
             elif msg_data == self.mla:
                 # MLA
+                self._unlistened()
                 # -> LADS
                 self.hpib_state = 2
                 # -> LPAS
                 self.sa_state = 3
                 self.next_event = None
-                self._flush_accum()
-                self.sec_addr = None
                 if not self.has_sa:
                     self._set_addressed(True)
             elif msg_data == 0x3f and self.hpib_state == 2:
                 # UNL
                 # -> idle
                 self.hpib_state = 0
-                self._flush_accum()
+                self._unlistened()
                 self._set_addressed(False)
             elif msg_data == self.mta:
                 # MTA
+                self._unlistened()
                 # -> TADS
                 self.hpib_state = 1
                 # -> TPAS
                 self.sa_state = 2
-                self._flush_accum()
                 self.next_event = RemotizerTalk(None)
                 if not self.has_sa:
                     self._set_addressed(True)
@@ -331,7 +342,7 @@ class RemotizerIO:
                     self._set_addressed(True)
                 elif self.sa_state == 3:
                     # MLA + SA
-                    self.sec_addr = msg_data & 0x1f
+                    self.listen_sa = msg_data & 0x1f
                     self._set_addressed(True)
                 elif self.sa_state == 4 and msg_data == self.msa:
                     # UNT + SA
@@ -339,14 +350,16 @@ class RemotizerIO:
         elif self.hpib_state == 2:
             # DAB
             self.accum.append(msg_data)
+            self.listen_data = True
             if len(self.accum) == 256:
                 self._flush_accum()
 
     def _fsm488_E(self , msg_data):
         if self.hpib_state == 2 and (self.signals & 1) != 0:
             self.accum.append(msg_data)
-            self._enqueue(RemotizerData(self.sec_addr , self.accum , True))
+            self._enqueue(RemotizerData(self.listen_sa, self.accum, True, False))
             self.accum = bytearray()
+            self.listen_data = False
 
     def _fsm488_J(self , msg_data):
         with self.lock:
@@ -536,6 +549,7 @@ class RemotizerIO:
         self.cv = threading.Condition(self.lock)
         self.q = collections.deque()
         self._init_488()
+        self.disable_unlisten_sa()
         self.status_byte = 0
         self.th = threading.Thread(target = self.__my_th)
         self.th.daemon = True
@@ -618,4 +632,10 @@ class RemotizerIO:
         self.status_byte = b & 0xbf
 
     def force_data(self , data):
-        self._enqueue(RemotizerData(None , data , False))
+        self._enqueue(RemotizerData(None, data, False, False))
+
+    def disable_unlisten_sa(self):
+        self.unlisten_sa = []
+
+    def set_unlisten_sa(self, sa_list):
+        self.unlisten_sa = sa_list

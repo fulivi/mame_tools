@@ -1,7 +1,7 @@
 HP Disk
 =======
 
-"HP disk" is a GUI-based tool that emulates HPIB disk drives. It emulates a few models that use the "Amigo" protocol and it connects to MAME emulator through the IEEE-488 remotizer.
+"HP disk" is a GUI-based tool that emulates HPIB disk drives. It emulates a few models that use the "Amigo" and "SS/80" protocols and it connects to MAME emulator through the IEEE-488 remotizer.
 
 This is the current list of emulated drives.
 
@@ -10,6 +10,7 @@ This is the current list of emulated drives.
 | 9134b      | 1               | 9.26 MiB |
 | 9895       | 2               | 1.13 MiB |
 | 82901      | 2               | 264 KiB |
+| 9122d      | 2               | 616 KiB |
 
 ## Installation
 
@@ -22,13 +23,13 @@ HP disk is composed of the following files:
 
 These files must be placed in the same directory.
 
-HP disk is written in Python 3. It requires the [PyQt5 library](https://www.riverbankcomputing.com/software/pyqt/download5). It can run on any platform where a Python 3 interpreter and the Qt5 library are available.
+HP disk is written in Python 3. It requires the [PyQt6 library](https://www.riverbankcomputing.com/software/pyqt/download). It can run on any platform where a Python 3 interpreter and the Qt6 library are available.
 
 ## Usage
 
 HP disk is run by launching `hp_disk.py` in the Python 3 interpreter.
 
-HP disk is to be run before starting MAME. It waits for a connection from MAME remotizer on 1234 TCP port.
+HP disk is to be run before starting MAME. It waits for a connection from MAME remotizer on 1234 TCP port by default. Port number can be set with the `--port` option when starting HP disk.
 
 The following figure shows the main elements of the GUI interface.
 
@@ -44,11 +45,11 @@ The following figure shows the main elements of the GUI interface.
 
 5. These fields display a summary of the emulated drive data.
 
-6. This field flashes red whenever the emulated drive is accessed by the host.
+6. These tabs select the unit to show. Unit name briefly flashes green or red when unit is being read or written, respectively.
 
-7. These fields display the name of image file (when loaded).
+7. This field displays the name of image file (when loaded).
 
-8. This section displays some statistics about each unit (total count of R/W sectors & current position).
+8. This section displays some statistics (total count of R/W sectors & current position).
 
 See also the usage instructions for `amigo_drive`.
 
@@ -69,6 +70,10 @@ Add these options when invoking MAME:
 Add these options when invoking MAME:
 
 `-rom1 massd -slot0 98034_hpib -slot0:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234`
+
+To use SSS mass storage ROM rev. B (for SS/80 support):
+
+`-rom1 sssmassb -slot0 98034_hpib -slot0:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234`
 
 ### HP9825T
 
@@ -95,3 +100,4 @@ Add these options when invoking MAME:
 ## Change history
 
 + 1.0: first release
++ 2.0: added support for SS/80 and 9122d drive
