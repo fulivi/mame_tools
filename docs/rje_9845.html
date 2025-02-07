@@ -3,18 +3,18 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<meta name="generator" content="Docutils 0.14: http://docutils.sourceforge.net/" />
+<meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 <title>Interfacing an IBM S/370 with HP9845</title>
 <style type="text/css">
 
 /*
 :Author: David Goodger (goodger@python.org)
-:Id: $Id: html4css1.css 7952 2016-07-26 18:15:59Z milde $
+:Id: $Id: html4css1.css 8954 2022-01-20 10:10:25Z milde $
 :Copyright: This stylesheet has been placed in the public domain.
 
 Default cascading style sheet for the HTML output of Docutils.
 
-See http://docutils.sf.net/docs/howto/html-stylesheets.html for how to
+See https://docutils.sourceforge.io/docs/howto/html-stylesheets.html for how to
 customize this style sheet.
 */
 
@@ -380,7 +380,7 @@ ul.auto-toc {
 <div class="section" id="ingredients">
 <h1>Ingredients</h1>
 <ul class="simple">
-<li>Hercules emulator (I used <a class="reference external" href="https://github.com/SDL-Hercules-390/hyperion">SDL-Hercules</a> at version 4.3.0)</li>
+<li>Hercules emulator (I used <a class="reference external" href="https://github.com/SDL-Hercules-390/hyperion">SDL-Hercules</a> at version 4.7.0)</li>
 <li>MAME emulator with the following ROM images:<ul>
 <li><tt class="docutils literal">hp9845b.zip</tt> HP9845B base system</li>
 <li><tt class="docutils literal">hp9845_prt.zip</tt> Printer characters</li>
@@ -396,7 +396,7 @@ ul.auto-toc {
 <li>The RJE disk image (available <a class="reference external" href="https://github.com/fulivi/mame_tools/blob/master/hp/RJE/rje_disk.hpi">here</a>)</li>
 <li><a class="reference external" href="https://github.com/fulivi/mame_tools/blob/master/hp/RJE/hercules_files.zip">hercules_files.zip</a> file holding various files needed by Hercules</li>
 <li>Python 3.x runtime</li>
-<li>PyQt5 library for <tt class="docutils literal">hp_disk</tt></li>
+<li>PyQt6 library for <tt class="docutils literal">hp_disk</tt></li>
 </ul>
 </div>
 <div class="section" id="recipe">
@@ -404,8 +404,7 @@ ul.auto-toc {
 <div class="section" id="structure">
 <h2>Structure</h2>
 <div class="figure">
-<object data="bisync.svg" type="image/svg+xml">
-bisync.svg</object>
+<object data="bisync.svg" type="image/svg+xml">bisync.svg</object>
 </div>
 <p>This figure shows the block diagram of the emulation setup.</p>
 <p>A few notes:</p>
@@ -495,7 +494,7 @@ bisync.svg</object>
 <ol class="arabic">
 <li><p class="first">Start MAME with the following command line (add other options you may need):</p>
 <pre class="literal-block">
-mess hp9845b -rompath &lt;whatever&gt; -rom1 datacomm -rom2 bisync -rom3 massd -slot0 98034_hpib -slot0:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234 -slot1 98046 -slot1:98046:rs232 rs232_sync_io -bitb2 socket.localhost:2780 -bitb3 print_out.txt
+mame hp9845b -rompath &lt;whatever&gt; -rom1 datacomm -rom2 bisync -rom3 massd -slot0 98034_hpib -slot0:98034_hpib:ieee_rem remote488 -bitb1 socket.localhost:1234 -slot1 98046 -slot1:98046:rs232 rs232_sync_io -bitb2 socket.localhost:2780 -bitb3 print_out.txt
 </pre>
 </li>
 <li><p class="first">Ensure emulated system is configured as shown here:</p>
