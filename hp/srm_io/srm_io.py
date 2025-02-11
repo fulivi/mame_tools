@@ -489,6 +489,19 @@ class Directory(DEntry):
     def get_lif_type(self):
         return 3
 
+def key_by_t_name(z):
+    'Sort by type and name'
+    if z.is_file():
+        r = z.name.lower().split('.')
+        if len(r) > 2:
+            r = r[:-2]
+        r = 1,r
+    elif z.is_dir():
+        r = 0,z.name.lower()
+    else:
+        return 99,z.name.lower()
+    return r
+
 class FS:
     def __init__(self, top_dir):
         self.top_dir = top_dir
@@ -549,7 +562,7 @@ class FS:
         c = []
         try:
             with os.scandir(path) as it:
-                for e in it:
+                for e in sorted(it,key=key_by_t_name):
                     if e.is_file() and (mo := self.re_filename.fullmatch(e.name)):
                         st = e.stat()
                         c.append(File(mo.group(1), None, path / e.name, st.st_mode, st.st_uid, st.st_gid, st.st_mtime, st.st_ctime, st.st_size, int(mo.group(3), 16), int(mo.group(2), 16)))
